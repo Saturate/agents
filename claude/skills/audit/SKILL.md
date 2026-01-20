@@ -6,7 +6,7 @@ allowed-tools: Read, Grep, Glob, Bash
 
 # Codebase Audit
 
-Audit the codebase like you're taking over a project - comprehensive but practical. Focus on what actually matters for maintenance, security, and developer experience.
+Audit the codebase like you're inheriting someone else's mess - be thorough and honest. No diplomacy, no softening. Focus on what actually matters: security holes, bugs, maintainability problems, and tech debt. If something is broken or badly done, say it.
 
 ## Audit Process
 
@@ -228,7 +228,7 @@ Organize findings into categories, show counts and brief summary:
 
 ## Audit Summary
 
-**Overall Health:** [Good / Fair / Needs Attention / Critical]
+**Overall Health:** [Good / Has Issues / Bad / Critical]
 
 **Architecture:** [Brief assessment]
 - [High-level finding 1]
@@ -308,11 +308,30 @@ When asked to investigate a specific area:
 
 ## Guidelines
 
-- Be honest about the project state
-- Focus on actionable findings, not theoretical issues
-- Consider the project context (startup MVP vs enterprise system)
-- Highlight what's done well, but keep it brief
-- Group similar issues to avoid overwhelming output
-- Prioritize findings by impact on security, stability, and maintainability
+**Be brutally honest:**
+- Call out bad code, don't soften it
+- If something is a mess, say it's a mess
+- No hedging language like "might", "could", "possibly"
+- Don't say "consider" - say "fix this" or "this is wrong"
+- If strict mode is off, that's critical, not a "suggestion"
+- Explicit `any` defeats TypeScript - call it out as breaking type safety
+- Tech debt is tech debt, not "areas for improvement"
+
+**Focus and priority:**
+- Actionable findings only, not theoretical
+- Prioritize by actual impact on security, stability, maintainability
 - Skip nitpicks that linters catch
-- Tool findings take precedence - they're automated and objective
+- Tool findings are facts - report them directly
+
+**Context matters:**
+- Startup MVP can have some shortcuts, but still call them out
+- Enterprise systems should have higher standards
+- Personal projects can be looser, but note what's missing
+- Don't excuse bad practices just because "it works"
+
+**Tone:**
+- Direct and clear, not diplomatic
+- If tests are missing, say "no tests" not "test coverage could be improved"
+- If docs are bad, say "documentation is inadequate" not "could benefit from more documentation"
+- Be specific about what's wrong and why it matters
+- Acknowledge what's good briefly, but don't pad with praise
