@@ -10,20 +10,66 @@ Audit the codebase like you're taking over a project - comprehensive but practic
 
 ## Audit Process
 
-### 1. Understand the Project
+### 1. Check Available Tools
+
+Run tool availability checks first:
+```bash
+command -v trufflehog
+command -v npm # or pnpm, yarn, pip, cargo, etc.
+```
+
+If any expected tools are missing:
+- List missing tools
+- Note them in output
+- Ask user if they want to continue without them
+
+### 2. Detect Project Type and Run Audits
+
+**Detect package manager:**
+- Check for `package-lock.json` → npm
+- Check for `pnpm-lock.yaml` → pnpm
+- Check for `yarn.lock` → yarn
+- Check for `requirements.txt` or `poetry.lock` → pip/poetry
+- Check for `Cargo.toml` → cargo
+- Check for `go.mod` → go
+
+**Run appropriate audits:**
+```bash
+# Node.js projects
+npm audit --json || pnpm audit --json || yarn audit --json
+
+# Python projects
+pip-audit --format json || safety check --json
+
+# Rust projects
+cargo audit --json
+
+# Go projects
+go list -json -m all | nancy sleuth
+```
+
+**Always run trufflehog for secrets:**
+```bash
+trufflehog filesystem . --json --no-update
+```
+
+Parse JSON outputs and integrate findings into audit report.
+
+### 3. Understand the Project
 
 - Check project structure (glob for key directories and files)
-- Identify tech stack from package.json, requirements.txt, go.mod, etc.
+- Identify tech stack from detected files
 - Look for documentation (README, CONTRIBUTING, docs/)
 - Check for CI/CD, linting, testing setup
 
-### 2. Critical Issues (Show Details Immediately)
+### 4. Critical Issues (Show Details Immediately)
 
 These must be surfaced with full context:
 
-**Security**
-- Hardcoded secrets, credentials, API keys
-- Known vulnerable dependencies
+**Security (from tools + manual review)**
+- Secrets found by trufflehog (file:line, type, severity)
+- Vulnerable dependencies from npm/pip/cargo audit (package, CVE, severity)
+- Hardcoded credentials or API keys in code
 - Missing authentication/authorization
 - Unsafe data handling patterns
 - Exposed sensitive endpoints
@@ -39,7 +85,7 @@ These must be surfaced with full context:
 - Missing error handling in critical paths
 - Race conditions in data operations
 
-### 3. High-Level Findings (Summary Only)
+### 5. High-Level Findings (Summary Only)
 
 Organize findings into categories, show counts and brief summary:
 
@@ -100,8 +146,25 @@ Organize findings into categories, show counts and brief summary:
 ## Output Format
 
 ```markdown
+## Tool Check
+
+**Available:** trufflehog, npm
+**Missing:** pip-audit (install with `pip install pip-audit`)
+
+[If tools are missing: "Continue audit without these tools? [y/n]"]
+
+---
+
+## Security Scan Results
+
+**trufflehog:** X secrets found
+**npm audit:** Y vulnerabilities (Z critical, W high)
+
+---
+
 ## Critical Issues 🚨
 [Detailed list with file:line, what's wrong, why it matters, how to fix]
+[Include findings from tools + manual review]
 
 ## Audit Summary
 
@@ -152,6 +215,30 @@ When asked to investigate a specific area:
 - Suggest concrete fixes
 - Prioritize by impact
 
+## Tool Output Handling
+
+**For npm/pnpm/yarn audit:**
+- Parse JSON output for vulnerabilities
+- Group by severity (critical, high, moderate, low)
+- Show package name, vulnerability, and recommended fix
+- Link to CVE/advisory when available
+
+**For trufflehog:**
+- Parse JSON for detected secrets
+- Show file, line number, secret type
+- Indicate if it's in git history or current files
+- Suggest remediation (rotate keys, use env vars, etc.)
+
+**For pip-audit/cargo audit:**
+- Similar to npm audit - parse JSON for vulns
+- Show package, version, fix version
+- Include CVE references
+
+**Error handling:**
+- If a tool fails, note it and continue
+- If output is unparseable, include raw relevant output
+- Don't let tool failures block the audit
+
 ## Guidelines
 
 - Be honest about the project state
@@ -161,3 +248,4 @@ When asked to investigate a specific area:
 - Group similar issues to avoid overwhelming output
 - Prioritize findings by impact on security, stability, and maintainability
 - Skip nitpicks that linters catch
+- Tool findings take precedence - they're automated and objective
