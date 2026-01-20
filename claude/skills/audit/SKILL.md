@@ -32,6 +32,7 @@ If any expected tools are missing:
 - Check for `requirements.txt` or `poetry.lock` → pip/poetry
 - Check for `Cargo.toml` → cargo
 - Check for `go.mod` → go
+- Check for `tsconfig.json` → TypeScript project
 
 **Run appropriate audits:**
 ```bash
@@ -55,6 +56,26 @@ trufflehog filesystem . --json --no-update
 
 Parse JSON outputs and integrate findings into audit report.
 
+**TypeScript projects (if tsconfig.json exists):**
+```bash
+# Check tsconfig.json for strict mode
+cat tsconfig.json | jq '.compilerOptions.strict'
+
+# Find explicit any usage
+grep -r ": any" --include="*.ts" --include="*.tsx" src/
+
+# Find type assertions (as keyword)
+grep -r " as " --include="*.ts" --include="*.tsx" src/
+
+# Find angle bracket type assertions
+grep -r "<[A-Z][^>]*>" --include="*.ts" --include="*.tsx" src/ | grep -v "React\|JSX\|Component"
+```
+
+Report findings:
+- **Critical** if strict: false or missing
+- **Important** if explicit `any` found
+- **Important** if type casting found (suggest narrowing instead)
+
 ### 3. Understand the Project
 
 - Check project structure (glob for key directories and files)
@@ -73,6 +94,11 @@ These must be surfaced with full context:
 - Missing authentication/authorization
 - Unsafe data handling patterns
 - Exposed sensitive endpoints
+
+**TypeScript Configuration (if TypeScript project)**
+- strict mode disabled or missing in tsconfig.json
+- explicit `any` types (defeats type safety)
+- type casting/assertions (use type narrowing instead)
 
 **Breaking Problems**
 - Build failures or broken configuration
@@ -160,6 +186,12 @@ Organize findings into categories, show counts and brief summary:
 **trufflehog:** X secrets found
 **npm audit:** Y vulnerabilities (Z critical, W high)
 
+## TypeScript Check (if applicable)
+
+**strict mode:** enabled/disabled/missing
+**explicit any:** X occurrences
+**type casting:** Y occurrences
+
 ---
 
 ## Critical Issues 🚨
@@ -233,6 +265,13 @@ When asked to investigate a specific area:
 - Similar to npm audit - parse JSON for vulns
 - Show package, version, fix version
 - Include CVE references
+
+**For TypeScript checks:**
+- Check tsconfig.json for `strict: true` (critical if false/missing)
+- Count and show file:line for explicit `any` usage
+- Count and show file:line for type assertions (`as`, `<Type>`)
+- Suggest type narrowing instead of casting
+- Note: React components with `<Component>` are acceptable (JSX syntax)
 
 **Error handling:**
 - If a tool fails, note it and continue
