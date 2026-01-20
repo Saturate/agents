@@ -76,12 +76,35 @@ Report findings:
 - **Important** if explicit `any` found
 - **Important** if type casting found (suggest narrowing instead)
 
-### 3. Understand the Project
+### 3. Detect Tech Stack and Understand Project
 
-- Check project structure (glob for key directories and files)
-- Identify tech stack from detected files
-- Look for documentation (README, CONTRIBUTING, docs/)
-- Check for CI/CD, linting, testing setup
+**Detect tech stack from files:**
+- `package.json` → Node.js, framework (React, Vue, Next.js, Express)
+- `tsconfig.json` → TypeScript
+- `requirements.txt` / `pyproject.toml` → Python, frameworks (Django, Flask, FastAPI)
+- `Cargo.toml` → Rust
+- `go.mod` → Go
+- `*.csproj` / `*.sln` → .NET (C#/F#)
+- `global.json` → .NET SDK version
+- `Dockerfile` / `docker-compose.yml` → Docker
+- `.github/workflows/` → GitHub Actions
+- `azure-pipelines.yml` → Azure DevOps
+- `bicep` / `*.bicep` → Azure Bicep (IaC)
+- `arm-template.json` → Azure ARM templates
+- `terraform` / `*.tf` → Terraform
+- `jest.config.js` / `vitest.config.ts` / `xunit` → Testing frameworks
+- `.eslintrc` / `.editorconfig` → Linting/formatting
+
+**Build a tech stack summary:**
+- Primary language(s) and versions
+- Frameworks and major libraries
+- Build/bundler tools
+- Testing framework
+- Cloud platform (Azure, AWS, GCP)
+- IaC tools (Bicep, Terraform, ARM)
+- CI/CD platform
+
+Also check project structure, documentation, and CI/CD setup
 
 ### 4. Critical Issues (Show Details Immediately)
 
@@ -178,6 +201,11 @@ Organize findings into categories, show counts and brief summary:
 **Missing:** pip-audit (install with `pip install pip-audit`)
 
 [If tools are missing: "Continue audit without these tools? [y/n]"]
+
+---
+
+## Tech Stack
+[Brief summary of detected languages, frameworks, cloud platform, CI/CD, testing tools]
 
 ---
 
