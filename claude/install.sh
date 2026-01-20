@@ -23,6 +23,7 @@ SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
 # Define source files and target directory
 SOURCE_FILES=("CLAUDE.md" "settings.json" "statusline-command.sh")
+SKILL_DIRS=("review" "audit")
 TARGET_DIR="$HOME/.claude"
 
 # Parse command line flags
@@ -169,6 +170,84 @@ for file in "${SOURCE_FILES[@]}"; do
     else
         echo "✗ Failed to create symlink for $file"
         skipped_files+=("$file (error)")
+    fi
+done
+
+# Process skill directories
+SKILLS_TARGET_DIR="$TARGET_DIR/skills"
+mkdir -p "$SKILLS_TARGET_DIR"
+
+for skill in "${SKILL_DIRS[@]}"; do
+    source_path="$SCRIPT_DIR/skills/$skill"
+    target_path="$SKILLS_TARGET_DIR/$skill"
+
+    # Check if source directory exists
+    if [ ! -d "$source_path" ]; then
+        echo "⚠️  Warning: Source skill directory not found: $source_path"
+        skipped_files+=("skills/$skill (source missing)")
+        continue
+    fi
+
+    # Check if target already exists
+    if [ -e "$target_path" ] || [ -L "$target_path" ]; then
+        # Check if it's already a symlink to the correct source
+        if [ -L "$target_path" ]; then
+            current_target=$(readlink "$target_path")
+            if [ "$current_target" = "$source_path" ]; then
+                echo "✓ skills/$skill is already correctly symlinked"
+                skipped_files+=("skills/$skill (already linked)")
+                continue
+            fi
+        fi
+
+        # Directory exists but is not the correct symlink
+        echo "⚠️  Skill directory exists: $target_path"
+
+        # Handle based on flags
+        if [ "$SKIP_EXISTING" = true ]; then
+            echo "  Skipping (--skip-existing flag set)"
+            skipped_files+=("skills/$skill (exists)")
+            continue
+        elif [ "$FORCE_BACKUP" = true ]; then
+            echo "  Backing up and replacing (--force flag set)"
+            backup_and_link "skills/$skill" "$source_path" "$target_path"
+            continue
+        else
+            # Interactive prompt
+            while true; do
+                read -p "  Backup existing directory and create symlink? [y/n/q] " answer
+                case $answer in
+                    [Yy]* )
+                        backup_and_link "skills/$skill" "$source_path" "$target_path"
+                        break
+                        ;;
+                    [Nn]* )
+                        echo "  Skipped skills/$skill"
+                        skipped_files+=("skills/$skill (user skipped)")
+                        break
+                        ;;
+                    [Qq]* )
+                        echo ""
+                        echo "Installation cancelled by user"
+                        exit 0
+                        ;;
+                    * )
+                        echo "  Please answer y (yes), n (no), or q (quit)"
+                        ;;
+                esac
+            done
+            continue
+        fi
+    fi
+
+    # Create the symlink (directory doesn't exist)
+    ln -s "$source_path" "$target_path"
+    if [ $? -eq 0 ]; then
+        echo "✓ Created symlink: skills/$skill"
+        linked_files+=("skills/$skill")
+    else
+        echo "✗ Failed to create symlink for skills/$skill"
+        skipped_files+=("skills/$skill (error)")
     fi
 done
 

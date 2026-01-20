@@ -29,3 +29,11 @@ Key Principle: Comments should only explain WHY, not what or how - that's the co
 - Use strict style
 - Never cast types - always narrow them
 - For API's prefer getting types from swagger or similar, no any or unknowns.
+
+# Git Commits
+
+Only consider the diff for the current changes, not the session history or prompt conversation.
+
+Write commit messages and PR descriptions as a humble but experienced engineer would. Keep it casual, avoid listicles, briefly describe what we're doing and highlight non-obvious implementation choices but don't overthink it.
+
+Don't embarrass me with robot speak, marketing buzzwords, or vague fluff. You're not writing a fucking pamphlet. Just leave a meaningful trace so someone can understand the choices later. Assume the reader is able to follow the code perfectly fine.

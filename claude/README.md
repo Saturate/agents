@@ -1,6 +1,10 @@
 # Claude Configuration
 
-Symlinks `CLAUDE.md`, `settings.json`, and `statusline-command.sh` to `~/.claude/`
+Symlinks `CLAUDE.md`, `settings.json`, `statusline-command.sh`, and custom skills to `~/.claude/`
+
+**Skills:**
+- `/review` - Code reviews for PRs and changes
+- `/audit` - Comprehensive codebase audits
 
 ## Usage
 
