@@ -1,7 +1,7 @@
 ---
 name: audit
 description: Performs comprehensive codebase audit checking architecture, tech debt, security, test coverage, documentation, dependencies, and maintainability. Use when auditing a project, assessing codebase health, or asked to audit/analyze the entire codebase.
-allowed-tools: Read, Grep, Glob, Bash
+allowed-tools: Read, Grep, Glob, Bash, WebSearch, WebFetch
 ---
 
 # Codebase Audit
@@ -51,10 +51,16 @@ go list -json -m all | nancy sleuth
 
 **Always run trufflehog for secrets:**
 ```bash
+# Scan current files
 trufflehog filesystem . --json --no-update
+
+# Scan git history (if git repo exists)
+if [ -d .git ]; then
+  trufflehog git file://. --json --no-update
+fi
 ```
 
-Parse JSON outputs and integrate findings into audit report.
+Parse JSON outputs and integrate findings into audit report. Git history scanning is critical - secrets may have been removed from current files but still exist in history.
 
 **TypeScript projects (if tsconfig.json exists):**
 ```bash
@@ -76,10 +82,77 @@ Report findings:
 - **Important** if explicit `any` found
 - **Important** if type casting found (suggest narrowing instead)
 
+**OWASP Top 10 Security Checks:**
+
+Check for common vulnerabilities:
+```bash
+# SQL Injection - string concatenation in queries
+grep -rn "query.*+" --include="*.js" --include="*.ts" --include="*.py" .
+grep -rn "execute.*%" --include="*.py" .
+
+# XSS - dangerous HTML injection
+grep -rn "innerHTML\|dangerouslySetInnerHTML" --include="*.js" --include="*.jsx" --include="*.ts" --include="*.tsx" --include="*.vue" .
+
+# Insecure auth storage - tokens in localStorage
+grep -rn "localStorage.*token\|localStorage.*auth\|localStorage.*jwt" --include="*.js" --include="*.ts" --include="*.vue" .
+
+# Missing CSRF protection
+grep -rn "csrf\|xsrf" -i --include="*.js" --include="*.ts" --include="*.py" .
+
+# Command injection
+grep -rn "exec\|shell=True\|spawn" --include="*.js" --include="*.ts" --include="*.py" .
+
+# Insecure deserialization
+grep -rn "pickle\.loads\|eval\(" --include="*.py" --include="*.js" --include="*.ts" .
+```
+
+Report OWASP findings as **critical** with file:line, explain risk, suggest fix.
+
+**Accessibility (a11y) Checks:**
+
+Essential a11y issues:
+```bash
+# Images without alt text
+grep -rn "<img" --include="*.jsx" --include="*.tsx" --include="*.vue" --include="*.html" . | grep -v 'alt='
+
+# Buttons without ARIA labels
+grep -rn "<button\|onClick" --include="*.jsx" --include="*.tsx" --include="*.vue" . | head -20
+
+# Form inputs without labels
+grep -rn "<input" --include="*.jsx" --include="*.tsx" --include="*.vue" --include="*.html" . | grep -v 'aria-label\|<label' | head -10
+
+# Interactive elements without keyboard support
+grep -rn "onClick" --include="*.jsx" --include="*.tsx" --include="*.vue" . | grep -v "onKeyDown\|onKeyPress" | head -10
+```
+
+Report a11y issues as **important** - they exclude real users.
+
+**Monitoring/Observability:**
+
+Check for production monitoring setup:
+```bash
+# Error tracking
+grep -rn "Sentry\|DataDog\|NewRelic\|AppInsights\|Rollbar" --include="*.js" --include="*.ts" --include="*.py" .
+
+# Structured logging
+grep -rn "winston\|pino\|bunyan\|structlog" --include="*.js" --include="*.ts" --include="*.py" .
+
+# Health endpoints
+grep -rn "/health\|/ready\|/live\|/ping" --include="*.js" --include="*.ts" --include="*.py" .
+
+# Console.log in production code (bad practice)
+grep -rn "console\\.log\|console\\.error" --include="*.js" --include="*.ts" . | grep -v "test\|spec\|\.test\.\|\.spec\."
+```
+
+Report missing observability as **important** for production systems.
+
 ### 3. Detect Tech Stack and Understand Project
 
 **Detect tech stack from files:**
-- `package.json` → Node.js, framework (React, Vue, Next.js, Express)
+- `package.json` → Node.js, framework (React, Vue, Nuxt, Next.js, Express)
+- `nuxt.config.ts` → Nuxt (Vue framework)
+- `next.config.js` → Next.js (React framework)
+- `vite.config.ts` → Vite
 - `tsconfig.json` → TypeScript
 - `requirements.txt` / `pyproject.toml` → Python, frameworks (Django, Flask, FastAPI)
 - `Cargo.toml` → Rust
@@ -103,6 +176,33 @@ Report findings:
 - Cloud platform (Azure, AWS, GCP)
 - IaC tools (Bicep, Terraform, ARM)
 - CI/CD platform
+
+**Framework best practices lookup:**
+
+If the project uses a major framework, look up current best practices:
+
+- **Nuxt/Vue project** → Use WebSearch or WebFetch to get Nuxt/Vue 3 best practices and common pitfalls
+- **Next.js/React project** → Look up Next.js App Router best practices, React Server Components if applicable
+- **Other frameworks** → Search for current best practices for the detected framework
+
+Focus on:
+- Framework-specific anti-patterns
+- Current recommended patterns (e.g., Vue Composition API vs Options API)
+- Performance optimization for that framework
+- Common mistakes developers make
+
+This ensures the audit checks against current best practices, not outdated knowledge.
+
+**Performance testing (if Chrome MCP available):**
+
+If chrome-devtools MCP is available and project is a web app:
+- Check for available MCP tools with `command -v` or check MCP server list
+- Ask user: "Provide URL for performance testing? [URL or skip]"
+- If URL provided:
+  - Use Chrome MCP `take_snapshot` or `performance_start_trace`
+  - Run Lighthouse-style audit
+  - Report Core Web Vitals (LCP, FID, CLS)
+  - Check bundle size, unoptimized images, render-blocking resources
 
 Also check project structure, documentation, and CI/CD setup
 
@@ -211,14 +311,38 @@ Organize findings into categories, show counts and brief summary:
 
 ## Security Scan Results
 
-**trufflehog:** X secrets found
-**npm audit:** Y vulnerabilities (Z critical, W high)
+**trufflehog (files):** X secrets found
+**trufflehog (git history):** Y secrets found in history
+**npm audit:** Z vulnerabilities (A critical, B high)
+**OWASP Top 10:** C issues found
 
 ## TypeScript Check (if applicable)
 
 **strict mode:** enabled/disabled/missing
 **explicit any:** X occurrences
 **type casting:** Y occurrences
+
+## Accessibility Check (if web project)
+
+**Missing alt text:** X images
+**Missing ARIA labels:** Y elements
+**Missing keyboard support:** Z interactive elements
+
+## Monitoring/Observability
+
+**Error tracking:** configured/missing
+**Structured logging:** configured/missing
+**Health endpoints:** present/missing
+**Console.logs in production:** X occurrences
+
+## Performance (if Chrome MCP and URL provided)
+
+**Core Web Vitals:**
+- LCP: X ms
+- FID: Y ms
+- CLS: Z score
+
+**Issues:** [Brief list]
 
 ---
 
