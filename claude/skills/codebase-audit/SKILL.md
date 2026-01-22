@@ -1,5 +1,5 @@
 ---
-name: audit
+name: codebase-audit
 description: Performs comprehensive codebase audit checking architecture, tech debt, security, test coverage, documentation, dependencies, and maintainability. Use when auditing a project, assessing codebase health, or asked to audit/analyze the entire codebase.
 allowed-tools: Read, Grep, Glob, Bash, WebSearch, WebFetch
 ---

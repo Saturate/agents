@@ -1,5 +1,5 @@
 ---
-name: review
+name: pr-review
 description: Performs comprehensive code reviews checking for bugs, security issues, performance problems, testing gaps, and code quality. Use when reviewing PRs, code changes, or when asked to review code.
 allowed-tools: Read, Grep, Glob, Bash
 ---
