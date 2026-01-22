@@ -36,6 +36,6 @@ Only consider the diff for the current changes, not the session history or promp
 
 Use Conventional Commits format (`type(scope): description`) unless the project has different conventions. Check existing commits to match the style.
 
-Write commit messages and PR descriptions as a humble but experienced engineer would. Keep it casual, avoid listicles, briefly describe what we're doing and highlight non-obvious implementation choices but don't overthink it.
+Write commit messages like a humble but experienced engineer would. Keep it casual, briefly describe what we're doing and highlight non-obvious implementation choices. Explain the why behind decisions.
 
-Don't embarrass me with robot speak, marketing buzzwords, or vague fluff. You're not writing a fucking pamphlet. Just leave a meaningful trace so someone can understand the choices later. Assume the reader is able to follow the code perfectly fine.
+No robot speak, marketing buzzwords, or listicles. Assume the reader can follow the code perfectly fine.
