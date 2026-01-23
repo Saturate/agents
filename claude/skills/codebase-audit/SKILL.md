@@ -1,7 +1,11 @@
 ---
 name: codebase-audit
 description: Performs comprehensive codebase audit checking architecture, tech debt, security, test coverage, documentation, dependencies, and maintainability. Use when auditing a project, assessing codebase health, or asked to audit/analyze the entire codebase.
-allowed-tools: Read, Grep, Glob, Bash, WebSearch, WebFetch
+compatibility: Requires trufflehog for secret scanning, npm/pnpm/yarn/pip/cargo for dependency audits. Optional Chrome DevTools MCP for performance testing.
+allowed-tools: Read Grep Glob Bash WebSearch WebFetch
+metadata:
+  author: Saturate
+  version: "1.0"
 ---
 
 # Codebase Audit
@@ -12,450 +16,180 @@ Audit the codebase like you're inheriting someone else's mess - be thorough and 
 
 ### 1. Check Available Tools
 
-Run tool availability checks first:
+Start by checking what tools you have available:
 ```bash
 command -v trufflehog
 command -v npm # or pnpm, yarn, pip, cargo, etc.
 ```
 
-If any expected tools are missing:
-- List missing tools
-- Note them in output
-- Ask user if they want to continue without them
+If any expected tools are missing, list them in your output and ask the user if they want to continue without them. Don't let missing tools block the entire audit.
 
 ### 2. Detect Project Type and Run Audits
 
-**Detect package manager:**
-- Check for `package-lock.json` → npm
-- Check for `pnpm-lock.yaml` → pnpm
-- Check for `yarn.lock` → yarn
-- Check for `requirements.txt` or `poetry.lock` → pip/poetry
-- Check for `Cargo.toml` → cargo
-- Check for `go.mod` → go
-- Check for `tsconfig.json` → TypeScript project
+**Figure out the package manager and run the right audit:**
+- `package-lock.json` → `npm audit --json`
+- `pnpm-lock.yaml` → `pnpm audit --json`
+- `yarn.lock` → `yarn audit --json`
+- `requirements.txt` / `poetry.lock` → `pip-audit --format json` or `safety check --json`
+- `Cargo.toml` → `cargo audit --json`
+- `go.mod` → `go list -json -m all | nancy sleuth`
 
-**Run appropriate audits:**
-```bash
-# Node.js projects
-npm audit --json || pnpm audit --json || yarn audit --json
+**Secret scanning:** Need help with TruffleHog? Check [references/secret-scanning.md](references/secret-scanning.md) for scanning both current files and git history.
 
-# Python projects
-pip-audit --format json || safety check --json
-
-# Rust projects
-cargo audit --json
-
-# Go projects
-go list -json -m all | nancy sleuth
-```
-
-**Always run trufflehog for secrets:**
-```bash
-# Scan current files
-trufflehog filesystem . --json --no-update
-
-# Scan git history (if git repo exists)
-if [ -d .git ]; then
-  trufflehog git file://. --json --no-update
-fi
-```
-
-Parse JSON outputs and integrate findings into audit report. Git history scanning is critical - secrets may have been removed from current files but still exist in history.
+Parse the JSON output from these tools and integrate what you find into the audit report.
 
 **TypeScript projects (if tsconfig.json exists):**
-```bash
-# Check tsconfig.json for strict mode
-cat tsconfig.json | jq '.compilerOptions.strict'
+- Check if `strict` mode is enabled (critical issue if it's false or missing)
+- Count how many times `any` is used explicitly (this defeats type safety)
+- Count type assertions using `as` or `<Type>` (suggest using type narrowing instead)
 
-# Find explicit any usage
-grep -r ": any" --include="*.ts" --include="*.tsx" src/
+**OWASP Top 10 checks:** See [references/owasp-top-10.md](references/owasp-top-10.md) for vulnerability patterns and detection commands. Report findings as **critical** with file:line, what the risk is, and how to fix it.
 
-# Find type assertions (as keyword)
-grep -r " as " --include="*.ts" --include="*.tsx" src/
-
-# Find angle bracket type assertions
-grep -r "<[A-Z][^>]*>" --include="*.ts" --include="*.tsx" src/ | grep -v "React\|JSX\|Component"
-```
-
-Report findings:
-- **Critical** if strict: false or missing
-- **Important** if explicit `any` found
-- **Important** if type casting found (suggest narrowing instead)
-
-**OWASP Top 10 Security Checks:**
-
-Check for common vulnerabilities:
-```bash
-# SQL Injection - string concatenation in queries
-grep -rn "query.*+" --include="*.js" --include="*.ts" --include="*.py" .
-grep -rn "execute.*%" --include="*.py" .
-
-# XSS - dangerous HTML injection
-grep -rn "innerHTML\|dangerouslySetInnerHTML" --include="*.js" --include="*.jsx" --include="*.ts" --include="*.tsx" --include="*.vue" .
-
-# Insecure auth storage - tokens in localStorage
-grep -rn "localStorage.*token\|localStorage.*auth\|localStorage.*jwt" --include="*.js" --include="*.ts" --include="*.vue" .
-
-# Missing CSRF protection
-grep -rn "csrf\|xsrf" -i --include="*.js" --include="*.ts" --include="*.py" .
-
-# Command injection
-grep -rn "exec\|shell=True\|spawn" --include="*.js" --include="*.ts" --include="*.py" .
-
-# Insecure deserialization
-grep -rn "pickle\.loads\|eval\(" --include="*.py" --include="*.js" --include="*.ts" .
-```
-
-Report OWASP findings as **critical** with file:line, explain risk, suggest fix.
-
-**Accessibility (a11y) Checks:**
-
-Essential a11y issues:
-```bash
-# Images without alt text
-grep -rn "<img" --include="*.jsx" --include="*.tsx" --include="*.vue" --include="*.html" . | grep -v 'alt='
-
-# Buttons without ARIA labels
-grep -rn "<button\|onClick" --include="*.jsx" --include="*.tsx" --include="*.vue" . | head -20
-
-# Form inputs without labels
-grep -rn "<input" --include="*.jsx" --include="*.tsx" --include="*.vue" --include="*.html" . | grep -v 'aria-label\|<label' | head -10
-
-# Interactive elements without keyboard support
-grep -rn "onClick" --include="*.jsx" --include="*.tsx" --include="*.vue" . | grep -v "onKeyDown\|onKeyPress" | head -10
-```
-
-Report a11y issues as **important** - they exclude real users.
+**Accessibility checks:** Check [references/accessibility-checklist.md](references/accessibility-checklist.md) for a11y detection commands and testing procedures. Report these as **important** because they exclude real users from using the app.
 
 **Monitoring/Observability:**
-
-Check for production monitoring setup:
-```bash
-# Error tracking
-grep -rn "Sentry\|DataDog\|NewRelic\|AppInsights\|Rollbar" --include="*.js" --include="*.ts" --include="*.py" .
-
-# Structured logging
-grep -rn "winston\|pino\|bunyan\|structlog" --include="*.js" --include="*.ts" --include="*.py" .
-
-# Health endpoints
-grep -rn "/health\|/ready\|/live\|/ping" --include="*.js" --include="*.ts" --include="*.py" .
-
-# Console.log in production code (bad practice)
-grep -rn "console\\.log\|console\\.error" --include="*.js" --include="*.ts" . | grep -v "test\|spec\|\.test\.\|\.spec\."
-```
-
-Report missing observability as **important** for production systems.
+Look for error tracking tools (Sentry, DataDog, NewRelic), structured logging libraries (winston, pino), health check endpoints, and watch out for console.logs making it to production. Report missing observability as **important** for production systems.
 
 ### 3. Detect Tech Stack and Understand Project
 
-**Detect tech stack from files:**
-- `package.json` → Node.js, framework (React, Vue, Nuxt, Next.js, Express)
-- `nuxt.config.ts` → Nuxt (Vue framework)
-- `next.config.js` → Next.js (React framework)
-- `vite.config.ts` → Vite
-- `tsconfig.json` → TypeScript
-- `requirements.txt` / `pyproject.toml` → Python, frameworks (Django, Flask, FastAPI)
-- `Cargo.toml` → Rust
-- `go.mod` → Go
-- `*.csproj` / `*.sln` → .NET (C#/F#)
-- `global.json` → .NET SDK version
-- `Dockerfile` / `docker-compose.yml` → Docker
-- `.github/workflows/` → GitHub Actions
-- `azure-pipelines.yml` → Azure DevOps
-- `bicep` / `*.bicep` → Azure Bicep (IaC)
-- `arm-template.json` → Azure ARM templates
-- `terraform` / `*.tf` → Terraform
-- `jest.config.js` / `vitest.config.ts` / `xunit` → Testing frameworks
-- `.eslintrc` / `.editorconfig` → Linting/formatting
+**Figure out the tech stack:** Need help identifying package managers, frameworks, cloud platforms, or IaC tools? See [references/tech-stack-detection.md](references/tech-stack-detection.md) for the complete detection guide.
 
-**Build a tech stack summary:**
-- Primary language(s) and versions
-- Frameworks and major libraries
-- Build/bundler tools
-- Testing framework
-- Cloud platform (Azure, AWS, GCP)
-- IaC tools (Bicep, Terraform, ARM)
-- CI/CD platform
+Build a summary that covers: language(s), framework, build tools, testing framework, cloud platform, IaC tools, and CI/CD platform.
 
-**Framework best practices lookup:**
+**Framework best practices:**
 
-If the project uses a major framework, look up current best practices:
+Once you know what framework they're using, check the relevant patterns guide:
+- **Next.js/React** → [references/framework-patterns-nextjs.md](references/framework-patterns-nextjs.md)
+- **Nuxt/Vue** → [references/framework-patterns-nuxt.md](references/framework-patterns-nuxt.md)
+- **Other frameworks** → Use WebSearch to look up current best practices and common mistakes
 
-- **Nuxt/Vue project** → Use WebSearch or WebFetch to get Nuxt/Vue 3 best practices and common pitfalls
-- **Next.js/React project** → Look up Next.js App Router best practices, React Server Components if applicable
-- **Other frameworks** → Search for current best practices for the detected framework
+**Performance testing (if Chrome MCP is available):**
 
-Focus on:
-- Framework-specific anti-patterns
-- Current recommended patterns (e.g., Vue Composition API vs Options API)
-- Performance optimization for that framework
-- Common mistakes developers make
+If this is a web app and you have access to chrome-devtools MCP:
+- Ask the user: "Want me to run performance tests? Provide a URL or say skip."
+- If they give you a URL, use Chrome MCP to run a Lighthouse-style audit
+- Report Core Web Vitals (LCP, FID, CLS), bundle size, unoptimized images, and render-blocking resources
 
-This ensures the audit checks against current best practices, not outdated knowledge.
-
-**Performance testing (if Chrome MCP available):**
-
-If chrome-devtools MCP is available and project is a web app:
-- Check for available MCP tools with `command -v` or check MCP server list
-- Ask user: "Provide URL for performance testing? [URL or skip]"
-- If URL provided:
-  - Use Chrome MCP `take_snapshot` or `performance_start_trace`
-  - Run Lighthouse-style audit
-  - Report Core Web Vitals (LCP, FID, CLS)
-  - Check bundle size, unoptimized images, render-blocking resources
-
-Also check project structure, documentation, and CI/CD setup
+Don't forget to also check the project structure, documentation quality, and CI/CD setup.
 
 ### 4. Critical Issues (Show Details Immediately)
 
-These must be surfaced with full context:
+Surface these issues with full context right away - don't bury them:
 
 **Security (from tools + manual review)**
-- Secrets found by trufflehog (file:line, type, severity)
-- Vulnerable dependencies from npm/pip/cargo audit (package, CVE, severity)
-- Hardcoded credentials or API keys in code
-- Missing authentication/authorization
-- Unsafe data handling patterns
-- Exposed sensitive endpoints
+- Secrets found by trufflehog - show file:line, what type of secret, and severity
+- Vulnerable dependencies from npm/pip/cargo audit - package name, CVE, severity
+- Hardcoded credentials or API keys sitting in the code
+- Missing authentication or authorization checks
+- Unsafe ways of handling data
+- Sensitive endpoints that are exposed
 
-**TypeScript Configuration (if TypeScript project)**
-- strict mode disabled or missing in tsconfig.json
-- explicit `any` types (defeats type safety)
-- type casting/assertions (use type narrowing instead)
+**TypeScript Configuration (if it's a TypeScript project)**
+- strict mode is disabled or missing from tsconfig.json
+- explicit `any` types being used (this defeats the whole point of TypeScript)
+- type casting/assertions (suggest type narrowing instead)
 
 **Breaking Problems**
 - Build failures or broken configuration
-- Missing critical dependencies
+- Missing dependencies that are critical
 - Incompatible version requirements
-- Database migrations without rollback
+- Database migrations that can't be rolled back
 
 **Data Loss Risks**
-- Operations without validation
-- Missing error handling in critical paths
-- Race conditions in data operations
+- Operations running without validation
+- Missing error handling in paths that matter
+- Race conditions in how data is handled
 
 ### 5. High-Level Findings (Summary Only)
 
-Organize findings into categories, show counts and brief summary:
+Organize what you found into categories with counts and brief summaries. Need help with the full category breakdown? Check [references/report-template.md](references/report-template.md).
 
-**Architecture & Structure**
-- Overall architecture pattern (MVC, microservices, monolith, etc.)
-- Code organization quality
-- Module coupling and cohesion
-- Circular dependencies
-- Missing abstractions or over-engineering
+**Categories to cover:**
+- Architecture & Structure
+- Tech Debt
+- Testing
+- Documentation
+- Dependencies
+- Performance
+- Developer Experience
+- Best Practices
 
-**Tech Debt**
-- Code duplication (significant patterns worth extracting)
-- Outdated patterns or anti-patterns
-- Commented-out code
-- TODOs and FIXMEs
-- Complex functions that need refactoring
-
-**Testing**
-- Test coverage (if measurable)
-- Missing tests in critical paths
-- Test quality and usefulness
-- Integration vs unit test balance
-
-**Documentation**
-- README quality and completeness
-- API documentation
-- Setup instructions
-- Architecture documentation
-- Inline code documentation where needed
-
-**Dependencies**
-- Outdated packages (majors, minors)
-- Unmaintained dependencies
-- Bloated dependency tree
-- Missing or loose version constraints
-
-**Performance**
-- Obvious bottlenecks
-- Inefficient algorithms
-- Database query issues
-- Large bundle sizes (frontend)
-- Memory leaks or resource handling
-
-**Developer Experience**
-- Build/dev setup complexity
-- Error messages quality
-- Debugging tools
-- Local development workflow
-- CI/CD pipeline speed
-
-**Best Practices**
-- Linting and formatting setup
-- Error handling patterns
-- Logging and observability
-- Configuration management
-- Environment handling
+For each one: give a brief assessment, count the major issues, and summarize the patterns you're seeing. Don't list every single detail here - that's what "Areas to Investigate" is for.
 
 ## Output Format
 
-```markdown
-## Tool Check
+Structure your audit report like this (see [references/report-template.md](references/report-template.md) for examples):
 
-**Available:** trufflehog, npm
-**Missing:** pip-audit (install with `pip install pip-audit`)
-
-[If tools are missing: "Continue audit without these tools? [y/n]"]
-
----
-
-## Tech Stack
-[Brief summary of detected languages, frameworks, cloud platform, CI/CD, testing tools]
-
----
-
-## Security Scan Results
-
-**trufflehog (files):** X secrets found
-**trufflehog (git history):** Y secrets found in history
-**npm audit:** Z vulnerabilities (A critical, B high)
-**OWASP Top 10:** C issues found
-
-## TypeScript Check (if applicable)
-
-**strict mode:** enabled/disabled/missing
-**explicit any:** X occurrences
-**type casting:** Y occurrences
-
-## Accessibility Check (if web project)
-
-**Missing alt text:** X images
-**Missing ARIA labels:** Y elements
-**Missing keyboard support:** Z interactive elements
-
-## Monitoring/Observability
-
-**Error tracking:** configured/missing
-**Structured logging:** configured/missing
-**Health endpoints:** present/missing
-**Console.logs in production:** X occurrences
-
-## Performance (if Chrome MCP and URL provided)
-
-**Core Web Vitals:**
-- LCP: X ms
-- FID: Y ms
-- CLS: Z score
-
-**Issues:** [Brief list]
-
----
-
-## Critical Issues 🚨
-[Detailed list with file:line, what's wrong, why it matters, how to fix]
-[Include findings from tools + manual review]
-
-## Audit Summary
-
-**Overall Health:** [Good / Has Issues / Bad / Critical]
-
-**Architecture:** [Brief assessment]
-- [High-level finding 1]
-- [High-level finding 2]
-
-**Tech Debt:** [Count of major issues]
-- [Summary of patterns]
-
-**Testing:** [Coverage %, major gaps]
-- [Brief assessment]
-
-**Documentation:** [Status]
-- [What's missing]
-
-**Dependencies:** [X outdated, Y vulnerabilities]
-- [High-level summary]
-
-**Performance:** [Status]
-- [Major concerns if any]
-
-**Developer Experience:** [Assessment]
-- [Key issues]
-
-**Best Practices:** [Status]
-- [Missing or inconsistent practices]
-
-## Areas to Investigate
-
-I can provide detailed analysis of:
-1. [Specific area like "Test coverage gaps"]
-2. [Specific area like "Dependency vulnerabilities"]
-3. [Specific area like "Code duplication patterns"]
-4. [etc.]
-
-Ask me to investigate any area for detailed findings with file:line references and specific recommendations.
-```
+1. **Tool Check** - What tools are available, what's missing
+2. **Tech Stack** - Languages, frameworks, cloud platform, CI/CD
+3. **Security Scan Results** - What trufflehog, npm audit, and OWASP checks found
+4. **TypeScript Check** - Strict mode status, any usage, type casting
+5. **Accessibility Check** - Missing alt text, ARIA labels, keyboard support
+6. **Monitoring/Observability** - Error tracking, logging, health endpoints
+7. **Performance** - If Chrome MCP is available and user provided a URL
+8. **Critical Issues 🚨** - Detailed breakdown with file:line, what the risk is, how to fix it
+9. **Audit Summary** - Overall health rating plus brief assessment for each category
+10. **Areas to Investigate** - Offer to dive deeper into specific areas with file:line details
 
 ## Investigation Process
 
-When asked to investigate a specific area:
-- Search for relevant patterns
-- Provide file:line references
-- Give specific examples
-- Suggest concrete fixes
-- Prioritize by impact
+When the user asks you to investigate a specific area:
+- Search for relevant patterns in the code
+- Give them file:line references so they can jump right to it
+- Show specific examples of what you found
+- Suggest concrete fixes they can implement
+- Prioritize by what will have the most impact
 
 ## Tool Output Handling
 
-**For npm/pnpm/yarn audit:**
-- Parse JSON output for vulnerabilities
-- Group by severity (critical, high, moderate, low)
-- Show package name, vulnerability, and recommended fix
-- Link to CVE/advisory when available
+Parse the JSON output from security tools and work the findings into your report:
+- Group them by severity (critical → low)
+- Show which package or file, what the vulnerability is, and how to fix it
+- Link to the CVE or advisory when you can
+- For trufflehog results, make it clear if the secret is in git history vs current files
 
-**For trufflehog:**
-- Parse JSON for detected secrets
-- Show file, line number, secret type
-- Indicate if it's in git history or current files
-- Suggest remediation (rotate keys, use env vars, etc.)
-
-**For pip-audit/cargo audit:**
-- Similar to npm audit - parse JSON for vulns
-- Show package, version, fix version
-- Include CVE references
-
-**For TypeScript checks:**
-- Check tsconfig.json for `strict: true` (critical if false/missing)
-- Count and show file:line for explicit `any` usage
-- Count and show file:line for type assertions (`as`, `<Type>`)
-- Suggest type narrowing instead of casting
-- Note: React components with `<Component>` are acceptable (JSX syntax)
-
-**Error handling:**
-- If a tool fails, note it and continue
-- If output is unparseable, include raw relevant output
-- Don't let tool failures block the audit
+If a tool fails to run, note it and keep going - don't let one tool failure block the entire audit.
 
 ## Guidelines
 
 **Be brutally honest:**
-- Call out bad code, don't soften it
+- Call out bad code. Don't soften it.
 - If something is a mess, say it's a mess
-- No hedging language like "might", "could", "possibly"
-- Don't say "consider" - say "fix this" or "this is wrong"
-- If strict mode is off, that's critical, not a "suggestion"
-- Explicit `any` defeats TypeScript - call it out as breaking type safety
+- No hedging with "might", "could", or "possibly"
+- Don't say "consider fixing" - say "fix this" or "this is wrong"
+- If strict mode is off in TypeScript, that's a critical issue, not a suggestion
+- Explicit `any` defeats the whole point of TypeScript - call it out as breaking type safety
 - Tech debt is tech debt, not "areas for improvement"
 
 **Focus and priority:**
-- Actionable findings only, not theoretical
-- Prioritize by actual impact on security, stability, maintainability
-- Skip nitpicks that linters catch
-- Tool findings are facts - report them directly
+- Only report findings they can actually act on, not theoretical problems
+- Prioritize by real impact on security, stability, and maintainability
+- Skip nitpicks that linters should catch
+- Tool findings are facts - just report them straight
 
 **Context matters:**
-- Startup MVP can have some shortcuts, but still call them out
-- Enterprise systems should have higher standards
-- Personal projects can be looser, but note what's missing
-- Don't excuse bad practices just because "it works"
+- Startup MVPs can have some shortcuts, but still call them out
+- Enterprise systems need to meet higher standards
+- Personal projects can be looser, but point out what's missing
+- Don't excuse bad practices just because "it works right now"
 
 **Tone:**
-- Direct and clear, not diplomatic
+- Be direct and clear, not diplomatic
 - If tests are missing, say "no tests" not "test coverage could be improved"
 - If docs are bad, say "documentation is inadequate" not "could benefit from more documentation"
 - Be specific about what's wrong and why it matters
-- Acknowledge what's good briefly, but don't pad with praise
+- Acknowledge what's good, but keep it brief - don't pad with praise
+
+## References
+
+Need more detailed guidance? Check these references:
+
+- **[Tech Stack Detection](references/tech-stack-detection.md)** - How to figure out what package managers, frameworks, cloud platforms, and IaC tools they're using
+- **[Secret Scanning Reference](references/secret-scanning.md)** - Complete guide to running TruffleHog on both current files and git history, plus common patterns and how to fix them
+- **[OWASP Top 10 Reference](references/owasp-top-10.md)** - Detection patterns and grep commands for finding all OWASP Top 10 vulnerabilities, with severity guidelines
+- **[Accessibility Checklist](references/accessibility-checklist.md)** - Practical commands for finding a11y issues and testing for WCAG compliance
+- **[Report Template](references/report-template.md)** - What the final report should look like, with example critical issues
+
+**Framework-specific patterns:**
+- **[Next.js / React Patterns](references/framework-patterns-nextjs.md)** - Best practices, common anti-patterns, and what to check in Next.js/React projects
+- **[Nuxt / Vue Patterns](references/framework-patterns-nuxt.md)** - Best practices, common anti-patterns, and what to check in Nuxt/Vue projects

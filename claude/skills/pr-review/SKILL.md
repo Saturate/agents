@@ -1,7 +1,11 @@
 ---
 name: pr-review
 description: Performs comprehensive code reviews checking for bugs, security issues, performance problems, testing gaps, and code quality. Use when reviewing PRs, code changes, or when asked to review code.
-allowed-tools: Read, Grep, Glob, Bash
+compatibility: Basic tools only - grep, file reading
+allowed-tools: Read Grep Glob Bash
+metadata:
+  author: Saturate
+  version: "1.0"
 ---
 
 # Code Review
@@ -9,6 +13,8 @@ allowed-tools: Read, Grep, Glob, Bash
 Review code like a senior engineer - thorough but practical. Focus on things that actually matter. Don't waste time on style nitpicks a linter should catch.
 
 ## Review Checklist
+
+Use this checklist to guide your review. Need examples of what to look for? Check out [references/common-issues.md](references/common-issues.md) for code patterns.
 
 ### Security (Critical)
 - [ ] Input validation and sanitization
@@ -49,22 +55,14 @@ Review code like a senior engineer - thorough but practical. Focus on things tha
 
 ## Output Format
 
-```markdown
-## Summary
-[One line: Good to merge / Has issues / Needs work]
+Structure your review like this (see [references/review-template.md](references/review-template.md) for detailed examples):
 
-## Critical
-[Security, data loss, crashes - must fix]
-
-## Important
-[Bugs, performance, missing tests - should fix]
-
-## Minor
-[Quality improvements - nice to have]
-
-## Questions
-[Things to clarify]
-```
+- **Summary:** One line verdict (Good to merge / Has issues / Needs work)
+- **Critical:** Security, data loss, crashes - must fix before merge
+- **Important:** Bugs, performance, missing tests - should fix
+- **Minor:** Quality improvements - nice to have
+- **Questions:** Things to clarify with the author
+- **Positive Notes:** Briefly acknowledge what's done well
 
 ## Guidelines
 
@@ -73,3 +71,10 @@ Review code like a senior engineer - thorough but practical. Focus on things tha
 - Explain impact, not just "this is wrong"
 - Consider trade-offs - sometimes simple is better than perfect
 - Briefly note if something is done well, but keep it short
+
+## References
+
+Need more guidance? Check these out:
+
+- **[Review Template](references/review-template.md)** - What your review output should look like, with severity categories and example issues
+- **[Common Issues](references/common-issues.md)** - Quick reference of problems that come up often in reviews, with good/bad code examples
