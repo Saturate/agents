@@ -8,8 +8,42 @@ dir=$(echo "$input" | jq -r '.workspace.current_dir')
 model_name=$(echo "$input" | jq -r '.model.display_name')
 context_window=$(echo "$input" | jq -r '.context_window')
 
-# Replace home directory with ~
+# Keep original dir for git commands, create display dir with ~
+dir_full="$dir"
 dir="${dir/#$HOME/~}"
+
+# Get git branch and status
+git_info=""
+if git -C "$dir_full" rev-parse --git-dir > /dev/null 2>&1; then
+    # Get current branch name
+    branch=$(git -C "$dir_full" symbolic-ref --short HEAD 2>/dev/null || git -C "$dir_full" rev-parse --short HEAD 2>/dev/null)
+
+    # Check for uncommitted changes
+    if git -C "$dir_full" diff-index --quiet HEAD -- 2>/dev/null; then
+        # Clean
+        status="✓"
+    else
+        # Dirty
+        status="✗"
+    fi
+
+    # Check ahead/behind
+    upstream=$(git -C "$dir_full" rev-parse --abbrev-ref --symbolic-full-name @{u} 2>/dev/null)
+    if [ -n "$upstream" ]; then
+        ahead=$(git -C "$dir_full" rev-list --count @{u}..HEAD 2>/dev/null || echo 0)
+        behind=$(git -C "$dir_full" rev-list --count HEAD..@{u} 2>/dev/null || echo 0)
+
+        if [ "$ahead" -gt 0 ] && [ "$behind" -gt 0 ]; then
+            status="$status ↑$ahead↓$behind"
+        elif [ "$ahead" -gt 0 ]; then
+            status="$status ↑$ahead"
+        elif [ "$behind" -gt 0 ]; then
+            status="$status ↓$behind"
+        fi
+    fi
+
+    git_info=" [$branch $status]"
+fi
 
 # Simplify model name (e.g., "Claude 3.5 Sonnet" -> "Sonnet 3.5")
 if [[ "$model_name" == *"Sonnet"* ]]; then
@@ -92,8 +126,8 @@ if [ "$usage" != "null" ]; then
 
     total_cost=$(awk "BEGIN {printf \"%.2f\", $input_cost + $output_cost}")
 
-    printf "%s (%s - %d%% - \$%s)" "$dir" "$model_short" "$pct" "$total_cost"
+    printf "%s%s (%s - %d%% - \$%s)" "$dir" "$git_info" "$model_short" "$pct" "$total_cost"
 else
     # No usage data yet
-    printf "%s (%s - 0%% - \$0.00)" "$dir" "$model_short"
+    printf "%s%s (%s - 0%% - \$0.00)" "$dir" "$git_info" "$model_short"
 fi
