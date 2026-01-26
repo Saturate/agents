@@ -62,6 +62,7 @@ Structure your review like this (see [references/review-template.md](references/
 - **Important:** Bugs, performance, missing tests - should fix
 - **Minor:** Quality improvements - nice to have
 - **Questions:** Things to clarify with the author
+- **Prevent This:** Suggest tooling/config to catch these issues automatically in the future
 - **Positive Notes:** Briefly acknowledge what's done well
 
 ## Guidelines
@@ -71,6 +72,29 @@ Structure your review like this (see [references/review-template.md](references/
 - Explain impact, not just "this is wrong"
 - Consider trade-offs - sometimes simple is better than perfect
 - Briefly note if something is done well, but keep it short
+
+### Suggesting Future Mitigations
+
+Only suggest mitigations for recurring patterns or critical issues. Don't suggest tools for one-off mistakes. Focus on automatable checks, not process changes.
+
+**TypeScript configuration:**
+- Type safety issues (`any`, implicit types) → Suggest `strict: true`, `noImplicitAny`, `strictNullChecks` in tsconfig.json
+- Missing null checks → Suggest `strictNullChecks: true`
+
+**Linting rules:**
+- Code quality patterns ESLint could catch → Suggest specific ESLint rules
+- Framework-specific issues → Suggest framework ESLint plugins (react-hooks, vue, etc.)
+- Formatting inconsistencies → Suggest Prettier in pre-commit hook
+
+**Pre-commit hooks:**
+- Secrets/credentials committed → Suggest trufflehog or git-secrets
+- Test failures → Suggest running tests before commit
+- Type errors → Suggest tsc --noEmit check
+
+**CI/CD checks:**
+- Security vulnerabilities → Suggest npm audit / dependency scanning
+- Missing tests → Suggest coverage thresholds
+- Build errors → Ensure build runs in CI
 
 ## References
 

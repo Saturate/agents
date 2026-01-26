@@ -124,6 +124,22 @@ setTimeout(cleanup, FIVE_MINUTES_MS);
 
 ---
 
+## Prevent This
+
+**TypeScript strict mode:**
+Enable `strictNullChecks` in tsconfig.json to catch the null handling issues found in counter.ts at compile time.
+
+**ESLint rule for error handling:**
+Add `no-empty-catch` or `@typescript-eslint/no-floating-promises` to catch unhandled promise rejections like the payment.ts issue.
+
+**Pre-commit hook for security:**
+Run `npm audit` or add git-secrets to pre-commit hooks to catch dependency vulnerabilities before they reach review.
+
+**CI type checking:**
+Add `tsc --noEmit` to CI pipeline to ensure type errors are caught automatically.
+
+---
+
 ## Positive Notes
 
 - Good test coverage for the happy path
