@@ -4,13 +4,34 @@
 input=$(cat)
 
 # Extract values
-dir=$(echo "$input" | jq -r '.workspace.current_dir')
+current_dir=$(echo "$input" | jq -r '.workspace.current_dir')
+project_dir=$(echo "$input" | jq -r '.workspace.project_dir')
 model_name=$(echo "$input" | jq -r '.model.display_name')
 context_window=$(echo "$input" | jq -r '.context_window')
 
-# Keep original dir for git commands, create display dir with ~
-dir_full="$dir"
-dir="${dir/#$HOME/~}"
+# Keep original dirs for git commands
+current_full="$current_dir"
+project_full="$project_dir"
+
+# Create display path with ~ substitution
+project_display="${project_dir/#$HOME/~}"
+current_display="${current_dir/#$HOME/~}"
+
+# Check if current dir is within project dir
+if [ "$current_dir" = "$project_dir" ]; then
+    # At project root
+    dir_display="$project_display"
+    dir_full="$project_full"
+elif [[ "$current_dir" == "$project_dir"/* ]]; then
+    # Inside project: show relative path
+    rel_path="${current_dir#$project_dir/}"
+    dir_display="$project_display:$rel_path"
+    dir_full="$current_full"
+else
+    # Outside project: show both directories
+    dir_display="$project_display → $current_display"
+    dir_full="$current_full"
+fi
 
 # Get git branch and status
 git_info=""
@@ -126,8 +147,8 @@ if [ "$usage" != "null" ]; then
 
     total_cost=$(awk "BEGIN {printf \"%.2f\", $input_cost + $output_cost}")
 
-    printf "%s%s (%s - %d%% - \$%s)" "$dir" "$git_info" "$model_short" "$pct" "$total_cost"
+    printf "%s%s (%s - %d%% - \$%s)" "$dir_display" "$git_info" "$model_short" "$pct" "$total_cost"
 else
     # No usage data yet
-    printf "%s%s (%s - 0%% - \$0.00)" "$dir" "$git_info" "$model_short"
+    printf "%s%s (%s - 0%% - \$0.00)" "$dir_display" "$git_info" "$model_short"
 fi
