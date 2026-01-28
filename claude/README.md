@@ -10,6 +10,11 @@ Performs comprehensive code reviews checking for bugs, security issues, performa
 ### `/codebase-audit` - Codebase Audit
 Brutally honest codebase audits covering architecture, tech debt, security (OWASP Top 10), accessibility, TypeScript strict mode, monitoring/observability, and framework best practices. Includes automated scans with trufflehog, npm audit, and more.
 
+### `/azure-init` - Azure DevOps Project Setup
+Initialize local development environment from Azure DevOps by cloning all project repositories. Automatically detects namespacing patterns and organizes repos intelligently - properly namespaced repos (e.g., `Acme.Platform.Api`) go directly in `~/code/`, while non-namespaced repos (e.g., `Api`, `Frontend`) are organized in project folders. Includes dry-run mode, SSH setup guidance, and handles failures gracefully.
+
+**Requirements:** Azure DevOps MCP connection and Git
+
 ## Quick Install
 
 ### Install Skills Only
@@ -30,4 +35,4 @@ cd claude
 ./install.sh --skip-existing   # Skip existing files
 ```
 
-This installs skills (`/pr-review` and `/codebase-audit`), coding guidelines (`CLAUDE.md`), settings (`settings.json`), and custom statusline script.
+This installs skills (`/pr-review`, `/codebase-audit`, and `/azure-init`), coding guidelines (`CLAUDE.md`), settings (`settings.json`), and custom statusline script.
