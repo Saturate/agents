@@ -4,6 +4,16 @@ Reference for: PR Review
 
 Use this template structure for code review outputs.
 
+## Table of Contents
+
+1. [Summary](#summary)
+2. [Critical](#critical)
+3. [Important](#important)
+4. [Minor](#minor)
+5. [Questions](#questions)
+6. [Prevent This](#prevent-this)
+7. [Positive Notes](#positive-notes)
+
 ---
 
 ## Summary

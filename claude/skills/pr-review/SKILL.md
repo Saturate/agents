@@ -1,16 +1,90 @@
 ---
 name: pr-review
-description: Performs comprehensive code reviews checking for bugs, security issues, performance problems, testing gaps, and code quality. Use when reviewing PRs, pull requests, code changes, commits, diffs, or when asked to review code, check code, audit changes, review my changes, check PR, or perform code review.
-compatibility: Basic tools only - grep, file reading
+description: Performs comprehensive code reviews checking for bugs, security issues, performance problems, testing gaps, and code quality. Accepts branch names or PR URLs (GitHub/Azure DevOps) to automatically checkout and review. Use when reviewing PRs, pull requests, code changes, commits, diffs, or when asked to review code, check code, audit changes, review my changes, check PR, review branch, or perform code review.
+compatibility: Basic tools - grep, file reading. Optional: gh CLI for GitHub PRs, az CLI for Azure DevOps PRs
 allowed-tools: Read Grep Glob Bash
 metadata:
   author: Saturate
-  version: "1.0"
+  version: "2.0"
 ---
 
 # Code Review
 
 Review code like a senior engineer - thorough but practical. Focus on things that actually matter. Don't waste time on style nitpicks a linter should catch.
+
+## Arguments
+
+The skill accepts optional arguments to determine what to review:
+
+**No arguments:** Ask user if they want to review the current branch
+
+**Branch name:** Checkout the branch and review it
+- Example: `/pr-review feat/redirect`
+- Example: `/pr-review feature/add-auth`
+
+**PR URL:** Supports GitHub and Azure DevOps PR URLs
+- Example: `/pr-review https://github.com/owner/repo/pull/123`
+- Example: `/pr-review https://dev.azure.com/org/project/_git/repo/pullrequest/456`
+- Platform-specific integration details are in reference files (loaded only when needed)
+
+## Step 0: Determine What to Review
+
+**If no arguments provided:**
+1. Check current git branch: `git branch --show-current`
+2. Ask user: "Review current branch `{branch-name}`?" (Yes/No)
+3. If No, ask: "Which branch or PR URL should I review?"
+4. Proceed based on response
+
+**If arguments provided:**
+
+**1. Detect if URL:**
+```bash
+if [[ "$args" =~ ^https?:// ]]; then
+  # It's a URL, determine platform
+  if [[ "$args" =~ github\.com ]]; then
+    # GitHub PR detected - READ references/github-pr-integration.md for implementation
+    # Follow the complete workflow in that file to:
+    # - Extract owner, repo, PR number from URL
+    # - Use gh CLI to get branch name
+    # - Checkout branch for review
+  elif [[ "$args" =~ dev\.azure\.com|visualstudio\.com ]]; then
+    # Azure DevOps PR detected - READ references/azure-pr-integration.md for implementation
+    # Follow the complete workflow in that file to:
+    # - Extract org, project, repo, PR number from URL
+    # - Use az CLI to get branch name
+    # - Checkout branch for review
+  else
+    echo "❌ Unsupported PR URL. Supports GitHub and Azure DevOps only."
+    exit 1
+  fi
+fi
+```
+
+**2. If not URL, treat as branch name:**
+```bash
+# Fetch latest changes
+git fetch origin
+
+# Checkout branch
+if git rev-parse --verify "$args" &> /dev/null; then
+  git checkout "$args"
+  git pull origin "$args"
+else
+  git checkout -b "$args" "origin/$args" 2>/dev/null || {
+    echo "❌ Branch '$args' not found locally or on remote"
+    exit 1
+  }
+fi
+```
+
+**3. Verify we're on a branch (not detached HEAD):**
+```bash
+current_branch=$(git branch --show-current)
+if [ -z "$current_branch" ]; then
+  echo "❌ Detached HEAD state - cannot review"
+  exit 1
+fi
+```
 
 ## Review Checklist
 
