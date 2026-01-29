@@ -1,6 +1,6 @@
 ---
 name: make-pr
-description: Creates pull requests on GitHub or Azure DevOps by analyzing commits and generating descriptions. Detects platform from git remote and uses gh CLI or az CLI. Use when asked to create PR, open PR, make pull request, submit PR, create pull request, PR workflow, or when user mentions PR creation. Generates casual, context-aware PR descriptions that explain WHY not WHAT.
+description: Creates pull requests on GitHub or Azure DevOps by analyzing commits and generating descriptions. Detects platform from git remote and uses gh CLI or az CLI. Use when asked to create PR, open PR, make pull request, submit PR, create pull request, new PR, raise PR, push PR, open pull request, submit changes, PR workflow, or when user mentions PR creation. Generates casual, context-aware PR descriptions that explain WHY not WHAT.
 compatibility: Requires git repository, gh CLI for GitHub or az CLI + azure-devops extension for Azure DevOps
 allowed-tools: Bash
 metadata:

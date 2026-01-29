@@ -4,6 +4,26 @@ Reference for: Codebase Audit
 
 Quick reference for detecting accessibility (a11y) issues in web applications.
 
+## Table of Contents
+
+1. [Why Accessibility Matters](#why-accessibility-matters)
+2. [Quick Detection Commands](#quick-detection-commands)
+3. [Semantic HTML](#1-semantic-html)
+4. [Images and Media](#2-images-and-media)
+5. [Keyboard Navigation](#3-keyboard-navigation)
+6. [Forms](#4-forms)
+7. [ARIA (Accessible Rich Internet Applications)](#5-aria-accessible-rich-internet-applications)
+8. [Color and Contrast](#6-color-and-contrast)
+9. [Focus Management](#7-focus-management)
+10. [Screen Reader Testing](#8-screen-reader-testing)
+11. [Common Patterns](#9-common-patterns)
+12. [Automated Testing Tools](#10-automated-testing-tools)
+13. [Priority Levels](#priority-levels)
+14. [Quick Checklist](#quick-checklist)
+15. [Resources](#resources)
+
+---
+
 ## Why Accessibility Matters
 
 - **15% of the world** has some form of disability

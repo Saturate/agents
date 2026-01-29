@@ -345,50 +345,14 @@ Next steps:
 
 ## Error Handling
 
-### MCP Not Available
-If Azure DevOps MCP tools are not available:
-```
-❌ Azure DevOps MCP is not installed or connected.
+Handle common errors gracefully. For detailed error messages and setup instructions, see [references/troubleshooting.md](references/troubleshooting.md).
 
-To set up Azure DevOps MCP:
-1. Run: /mcp
-2. Follow the setup instructions to install the Azure DevOps MCP server
-3. Once connected, try again with: /azure-init "project-name"
-
-For more info: https://github.com/brynshanahan/azure-devops-mcp
-```
-
-### SSH Not Configured
-If git clone fails with "Permission denied (publickey)":
-```
-❌ SSH authentication failed. You need to configure SSH keys for Azure DevOps.
-
-To set up SSH keys:
-1. Generate SSH key (if you don't have one):
-   ssh-keygen -t rsa -b 4096 -C "your.email@example.com"
-
-2. Copy your public key:
-   cat ~/.ssh/id_rsa.pub
-
-3. Add to Azure DevOps:
-   - Go to: https://dev.azure.com/{org}/_usersSettings/keys
-   - Click "New Key"
-   - Paste your public key
-   - Save
-
-4. Test connection:
-   ssh -T git@ssh.dev.azure.com
-
-For more info: https://learn.microsoft.com/en-us/azure/devops/repos/git/use-ssh-keys-to-authenticate
-```
-
-### Other Common Errors
-
-- **Project not found**: List available projects or suggest searching
-- **No repositories**: Inform user the project has no repositories
+**Common error scenarios:**
+- **MCP not available**: Guide user through MCP setup
+- **SSH not configured**: Provide SSH key generation and setup instructions
+- **Project not found**: List available projects or suggest search improvements
 - **Clone failures**: Report which repository failed and why
-- **Directory permission issues**: Report and suggest using sudo or different directory
-- **Network issues**: Suggest checking internet connection and Azure DevOps status
+- **Permission issues**: Suggest alternative directory or permission fixes
 
 ## Prerequisites
 
@@ -397,35 +361,7 @@ For more info: https://learn.microsoft.com/en-us/azure/devops/repos/git/use-ssh-
 - Azure DevOps MCP connection must be active
 - SSH authentication must be configured for Azure DevOps
 
-🔍 **Verification:**
-- Git: Checked automatically in step 0 with `git --version`
-- MCP: Checked automatically in step 0 by attempting to list projects
-- SSH: Checked during first clone attempt (fails gracefully with setup instructions)
-
-## MCP Setup Reference
-
-If user needs to set up Azure DevOps MCP, guide them through:
-
-1. **Check if MCP exists:**
-   ```bash
-   ls ~/.config/claude/mcp.json
-   ```
-
-2. **Install Azure DevOps MCP:**
-   ```bash
-   # The specific installation method depends on the MCP server implementation
-   # Common approach is adding to mcp.json configuration
-   ```
-
-3. **Connect to MCP:**
-   ```bash
-   /mcp  # In Claude Code
-   ```
-
-4. **Test connection:**
-   ```bash
-   # Try listing projects to verify
-   ```
+🔍 **Automatic verification** happens in step 0 - See [references/troubleshooting.md](references/troubleshooting.md) for detailed setup instructions
 
 ## Notes
 

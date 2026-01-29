@@ -4,6 +4,20 @@ Reference for: Codebase Audit
 
 Use this template structure for audit outputs.
 
+## Table of Contents
+
+1. [Tool Check](#tool-check)
+2. [Tech Stack](#tech-stack)
+3. [Security Scan Results](#security-scan-results)
+4. [TypeScript Check](#typescript-check)
+5. [Accessibility Check](#accessibility-check)
+6. [Monitoring/Observability](#monitoringobservability)
+7. [Critical Issues](#critical-issues-)
+8. [Audit Summary](#audit-summary)
+9. [Areas to Investigate](#areas-to-investigate)
+10. [Recommendations by Priority](#recommendations-by-priority)
+11. [Summary](#summary)
+
 ---
 
 ## Tool Check

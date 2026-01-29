@@ -4,6 +4,19 @@ Reference for: Codebase Audit
 
 How to detect project type, tech stack, and build configuration from filesystem.
 
+## Table of Contents
+
+1. [Package Manager Detection](#package-manager-detection)
+2. [Language and Framework Detection](#language-and-framework-detection)
+3. [Cloud Platform Detection](#cloud-platform-detection)
+4. [Infrastructure and Tools](#infrastructure-and-tools)
+5. [Build Tool Detection](#build-tool-detection)
+6. [Database Detection](#database-detection)
+7. [How to Build Tech Stack Summary](#how-to-build-tech-stack-summary)
+8. [Example Output](#example-output)
+
+---
+
 ## Package Manager Detection
 
 Check for lock files to determine package manager:

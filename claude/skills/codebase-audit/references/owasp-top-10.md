@@ -4,6 +4,24 @@ Reference for: Codebase Audit
 
 Quick reference for detecting OWASP Top 10 vulnerabilities in code audits.
 
+## Table of Contents
+
+1. [Broken Access Control](#1-broken-access-control)
+2. [Cryptographic Failures](#2-cryptographic-failures)
+3. [Injection (SQL, Command, etc.)](#3-injection-sql-command-etc)
+4. [Insecure Design](#4-insecure-design)
+5. [Security Misconfiguration](#5-security-misconfiguration)
+6. [Vulnerable and Outdated Components](#6-vulnerable-and-outdated-components)
+7. [Identification and Authentication Failures](#7-identification-and-authentication-failures)
+8. [Software and Data Integrity Failures](#8-software-and-data-integrity-failures)
+9. [Security Logging and Monitoring Failures](#9-security-logging-and-monitoring-failures)
+10. [Server-Side Request Forgery (SSRF)](#10-server-side-request-forgery-ssrf)
+11. [Quick Audit Commands](#quick-audit-commands)
+12. [Severity Levels](#severity-levels)
+13. [Resources](#resources)
+
+---
+
 ## 1. Broken Access Control
 
 **Risk:** Users acting outside intended permissions.

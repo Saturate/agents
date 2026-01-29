@@ -4,6 +4,19 @@ Reference for: Codebase Audit
 
 Use this when scanning for hardcoded secrets, API keys, credentials, and sensitive data in code and git history.
 
+## Table of Contents
+
+1. [TruffleHog](#trufflehog)
+2. [Common Secret Patterns](#common-secret-patterns)
+3. [Integration with CI/CD](#integration-with-cicd)
+4. [Remediation Steps](#remediation-steps)
+5. [Alternative Tools](#alternative-tools)
+6. [Quick Comparison](#quick-comparison)
+7. [Common False Positives](#common-false-positives)
+8. [Quick Commands](#quick-commands)
+
+---
+
 ## TruffleHog
 
 The primary tool for secret scanning in codebase audits.

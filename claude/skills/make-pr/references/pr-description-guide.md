@@ -2,6 +2,21 @@
 
 This guide helps you write effective PR descriptions with a casual but experienced engineer tone, explaining WHY not WHAT, avoiding robot speak.
 
+## Table of Contents
+
+1. [Core Principles](#core-principles)
+2. [Structure](#structure)
+3. [Title Guidelines](#title-guidelines)
+4. [Description Guidelines](#description-guidelines)
+5. [Analyzing Commits for Content](#analyzing-commits-for-content)
+6. [Style Examples](#style-examples)
+7. [What to Include](#what-to-include)
+8. [Length Guidelines](#length-guidelines)
+9. [Platform-Specific Notes](#platform-specific-notes)
+10. [Quick Reference](#quick-reference)
+
+---
+
 ## Core Principles
 
 1. **Humble but experienced engineer tone** - You're explaining to a peer, not showing off

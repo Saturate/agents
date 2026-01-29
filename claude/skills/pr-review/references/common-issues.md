@@ -4,6 +4,19 @@ Reference for: PR Review
 
 Quick reference for frequently found issues in code reviews.
 
+## Table of Contents
+
+1. [Security](#security)
+2. [Error Handling](#error-handling)
+3. [Performance](#performance)
+4. [Logic Bugs](#logic-bugs)
+5. [Code Quality](#code-quality)
+6. [TypeScript Issues](#typescript-issues)
+7. [Testing](#testing)
+8. [Quick Reference](#quick-reference)
+
+---
+
 ## Security
 
 ### Hardcoded Secrets

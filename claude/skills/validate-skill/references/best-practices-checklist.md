@@ -15,6 +15,28 @@ Comprehensive checklist extracted from official Anthropic documentation for vali
 
 ---
 
+## Table of Contents
+
+1. [Source Documentation](#source-documentation)
+2. [Core Principles](#core-principles)
+3. [Frontmatter Requirements](#frontmatter-requirements)
+4. [File Structure](#file-structure)
+5. [Progressive Disclosure](#progressive-disclosure)
+6. [Content Quality](#content-quality)
+7. [Anti-Patterns to Avoid](#anti-patterns-to-avoid)
+8. [Scripts and Executable Code](#scripts-and-executable-code)
+9. [String Substitutions](#string-substitutions)
+10. [MCP Tools](#mcp-tools)
+11. [Testing and Iteration](#testing-and-iteration)
+12. [Advanced: Visual Output](#advanced-visual-output)
+13. [Platform-Specific Notes](#platform-specific-notes)
+14. [Final Checklist](#final-checklist)
+15. [Scoring Rubric](#scoring-rubric)
+16. [Common Issues and Fixes](#common-issues-and-fixes)
+17. [Resources](#resources)
+
+---
+
 ## Core Principles
 
 ### Conciseness

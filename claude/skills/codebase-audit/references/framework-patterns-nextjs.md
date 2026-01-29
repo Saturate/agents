@@ -4,6 +4,22 @@ Reference for: Codebase Audit
 
 Current best practices for Next.js and React projects. Focus on what actually matters for the audit.
 
+## Table of Contents
+
+1. [Version Detection](#version-detection)
+2. [Routing Pattern Detection](#routing-pattern-detection)
+3. [Common Anti-Patterns](#common-anti-patterns)
+4. [Performance Anti-Patterns](#performance-anti-patterns)
+5. [State Management Issues](#state-management-issues)
+6. [Security Issues](#security-issues)
+7. [React-Specific Anti-Patterns](#react-specific-anti-patterns)
+8. [Recommended Checks](#recommended-checks)
+9. [When to Flag as Critical](#when-to-flag-as-critical)
+10. [When to Flag as Important](#when-to-flag-as-important)
+11. [When to Flag as Minor](#when-to-flag-as-minor)
+
+---
+
 ## Version Detection
 
 Check `package.json` for versions:

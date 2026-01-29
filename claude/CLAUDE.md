@@ -39,3 +39,12 @@ Use Conventional Commits format (`type(scope): description`) unless the project 
 Write commit messages like a humble but experienced engineer would. Keep it casual, briefly describe what we're doing and highlight non-obvious implementation choices. Explain the why behind decisions.
 
 No robot speak, marketing buzzwords, or listicles. Assume the reader can follow the code perfectly fine.
+
+# Exports and Clipboard
+
+When I ask for content to "export", "handoff", "save for later", or similar - automatically copy it to clipboard using the appropriate tool:
+- macOS: `pbcopy`
+- Linux: `xclip -selection clipboard` (if available)
+- Windows/WSL: `clip.exe`
+
+Useful for: prompt handoffs, summaries, formatted outputs, git info, file paths, etc.

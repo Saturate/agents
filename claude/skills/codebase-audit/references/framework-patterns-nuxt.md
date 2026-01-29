@@ -4,6 +4,23 @@ Reference for: Codebase Audit
 
 Current best practices for Nuxt and Vue projects. Focus on what actually matters for the audit.
 
+## Table of Contents
+
+1. [Version Detection](#version-detection)
+2. [Project Structure Detection](#project-structure-detection)
+3. [Common Anti-Patterns](#common-anti-patterns)
+4. [Performance Anti-Patterns](#performance-anti-patterns)
+5. [Nuxt-Specific Issues](#nuxt-specific-issues)
+6. [State Management Issues](#state-management-issues)
+7. [Security Issues](#security-issues)
+8. [Vue-Specific Anti-Patterns](#vue-specific-anti-patterns)
+9. [Recommended Checks](#recommended-checks)
+10. [When to Flag as Critical](#when-to-flag-as-critical)
+11. [When to Flag as Important](#when-to-flag-as-important)
+12. [When to Flag as Minor](#when-to-flag-as-minor)
+
+---
+
 ## Version Detection
 
 Check `package.json` for versions:

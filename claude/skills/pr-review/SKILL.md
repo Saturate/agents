@@ -1,6 +1,6 @@
 ---
 name: pr-review
-description: Performs comprehensive code reviews checking for bugs, security issues, performance problems, testing gaps, and code quality. Use when reviewing PRs, code changes, or when asked to review code.
+description: Performs comprehensive code reviews checking for bugs, security issues, performance problems, testing gaps, and code quality. Use when reviewing PRs, pull requests, code changes, commits, diffs, or when asked to review code, check code, audit changes, review my changes, check PR, or perform code review.
 compatibility: Basic tools only - grep, file reading
 allowed-tools: Read Grep Glob Bash
 metadata:
