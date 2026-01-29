@@ -6,14 +6,139 @@ Quick reference for frequently found issues in code reviews.
 
 ## Table of Contents
 
-1. [Security](#security)
-2. [Error Handling](#error-handling)
-3. [Performance](#performance)
-4. [Logic Bugs](#logic-bugs)
-5. [Code Quality](#code-quality)
-6. [TypeScript Issues](#typescript-issues)
-7. [Testing](#testing)
-8. [Quick Reference](#quick-reference)
+1. [Type Safety Violations](#type-safety-violations)
+2. [Security](#security)
+3. [Error Handling](#error-handling)
+4. [Performance](#performance)
+5. [Logic Bugs](#logic-bugs)
+6. [Code Quality](#code-quality)
+7. [TypeScript Issues](#typescript-issues)
+8. [Testing](#testing)
+9. [Quick Reference](#quick-reference)
+
+---
+
+## Type Safety Violations
+
+**Critical:** Type casts and assertions bypass TypeScript's safety checks. Most projects forbid these - check CLAUDE.md.
+
+### Type Casting Instead of Narrowing
+
+❌ **Bad - Type Assertion:**
+```typescript
+interface IRedirect {
+  targetUrl: string
+  statusCode: number
+}
+
+if (content.entry.itemType === 'IRedirectViewModel') {
+  const redirect = content.entry.item as IRedirect  // Bypasses type checking!
+}
+```
+
+**Problems:**
+- No runtime guarantee that `item` matches `IRedirect` structure
+- Changes to `IRedirect` won't be caught if `item` doesn't match
+- Violates most project guidelines (check CLAUDE.md)
+
+✅ **Good - Discriminated Union:**
+```typescript
+interface RedirectEntry {
+  itemType: 'IRedirectViewModel'
+  item: IRedirect
+}
+
+interface PageEntry {
+  itemType: 'IPageViewModel'
+  item: IPage
+}
+
+type ContentEntry = RedirectEntry | PageEntry
+
+// TypeScript narrows automatically based on discriminant
+if (content.entry.itemType === 'IRedirectViewModel') {
+  const redirect = content.entry.item  // TypeScript knows this is IRedirect
+  console.log(redirect.targetUrl)  // Type-safe!
+}
+```
+
+✅ **Good - Type Guard:**
+```typescript
+function isRedirect(item: unknown): item is IRedirect {
+  return (
+    item !== null &&
+    typeof item === 'object' &&
+    'targetUrl' in item &&
+    typeof item.targetUrl === 'string' &&
+    'statusCode' in item &&
+    typeof item.statusCode === 'number'
+  )
+}
+
+if (isRedirect(content.entry.item)) {
+  const redirect = content.entry.item  // Safely narrowed with runtime check
+  console.log(redirect.targetUrl)  // Type-safe!
+}
+```
+
+✅ **Good - Validation Library:**
+```typescript
+import { z } from 'zod'
+
+const RedirectSchema = z.object({
+  targetUrl: z.string(),
+  statusCode: z.number()
+})
+
+// Parse validates structure at runtime
+const redirect = RedirectSchema.parse(content.entry.item)
+console.log(redirect.targetUrl)  // Type-safe and validated!
+```
+
+### Non-Null Assertion
+
+❌ **Bad:**
+```typescript
+const user = users.find(u => u.id === userId)!  // What if not found?
+console.log(user.name)  // Runtime error if user is undefined
+```
+
+✅ **Good:**
+```typescript
+const user = users.find(u => u.id === userId)
+if (!user) {
+  throw new Error(`User ${userId} not found`)
+}
+console.log(user.name)  // Safe - TypeScript knows user is defined
+```
+
+### Double Assertion
+
+❌ **Bad - Double Assertion:**
+```typescript
+const value = input as unknown as SomeType  // Extremely dangerous!
+```
+
+**Never do this.** If you need this, your type definitions are wrong.
+
+### When Type Assertions Are Acceptable
+
+Very rarely, in specific cases:
+- Reading from `localStorage` where you control the format
+- Working with poorly-typed third-party libraries
+- **Always validate at runtime when using assertions**
+
+```typescript
+// If you must use `as`, validate immediately after
+const stored = localStorage.getItem('user') as string | null
+if (!stored) throw new Error('No user in storage')
+
+const user = JSON.parse(stored)
+// Validate the parsed object matches expected structure
+if (!user.id || typeof user.name !== 'string') {
+  throw new Error('Invalid user data in storage')
+}
+```
 
 ---
 

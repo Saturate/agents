@@ -64,7 +64,59 @@ await db.query(query, [req.params.id]);
 
 ## Important
 
-### 1. Missing Error Handling
+### 1. Type Cast Violates Project Guidelines
+
+**File:** `src/app.vue:28`
+
+**Guideline:** CLAUDE.md states: "Never cast types - always narrow them"
+
+**Code:**
+```typescript
+if (content.entry.itemType === 'IRedirectViewModel') {
+  const redirect = content.entry.item as IRedirect
+  navigateTo(redirect.targetUrl)
+}
+```
+
+**Issue:** Type assertion bypasses TypeScript's safety checks. No runtime guarantee that `item` matches `IRedirect` structure.
+
+**Fix - Use discriminated union:**
+```typescript
+// Update type definition
+interface RedirectEntry {
+  itemType: 'IRedirectViewModel'
+  item: IRedirect
+}
+
+interface PageEntry {
+  itemType: 'IPageViewModel'
+  item: IPage
+}
+
+type ContentEntry = RedirectEntry | PageEntry
+
+// TypeScript narrows automatically
+if (content.entry.itemType === 'IRedirectViewModel') {
+  const redirect = content.entry.item  // Type-safe!
+  navigateTo(redirect.targetUrl)
+}
+```
+
+**Alternative - Use type guard:**
+```typescript
+function isRedirect(item: unknown): item is IRedirect {
+  return item !== null &&
+         typeof item === 'object' &&
+         'targetUrl' in item &&
+         typeof item.targetUrl === 'string'
+}
+
+if (isRedirect(content.entry.item)) {
+  navigateTo(content.entry.item.targetUrl)
+}
+```
+
+### 2. Missing Error Handling
 
 **File:** `src/services/payment.ts:67-82`
 
@@ -83,7 +135,7 @@ try {
 }
 ```
 
-### 2. Race Condition in Counter
+### 3. Race Condition in Counter
 
 **File:** `src/utils/counter.ts:23-27`
 

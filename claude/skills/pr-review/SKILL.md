@@ -27,7 +27,33 @@ The skill accepts optional arguments to determine what to review:
 - Example: `/pr-review https://dev.azure.com/org/project/_git/repo/pullrequest/456`
 - Platform-specific integration details are in reference files (loaded only when needed)
 
-## Step 0: Determine What to Review
+## Step 0: Read Project Guidelines
+
+**Before reviewing code, read project-specific guidelines:**
+
+1. Check for `CLAUDE.md` in the repository root
+2. Check for global guidelines at `~/.claude/CLAUDE.md`
+3. Extract key rules to check during review:
+   - Type safety requirements (no casts, no `any`, etc.)
+   - Testing requirements
+   - Code style preferences
+   - Backward compatibility rules
+
+**Common patterns to extract:**
+```bash
+# Look for type safety rules
+grep -i "never cast\|no any\|no type assertion" CLAUDE.md ~/.claude/CLAUDE.md
+
+# Look for testing requirements
+grep -i "test\|coverage" CLAUDE.md ~/.claude/CLAUDE.md
+
+# Look for git/commit rules
+grep -i "commit\|backward compat" CLAUDE.md ~/.claude/CLAUDE.md
+```
+
+If no CLAUDE.md exists, proceed with general best practices only.
+
+## Step 1: Determine What to Review
 
 **If no arguments provided:**
 1. Check current git branch: `git branch --show-current`
@@ -131,6 +157,9 @@ Use this checklist to guide your review. Need examples of what to look for? Chec
 - [ ] No unnecessary complexity or clever code
 - [ ] Duplication worth extracting
 - [ ] Names match what they do
+- [ ] **Follows project guidelines in CLAUDE.md (if present)**
+- [ ] **No type casts/assertions (`as`, `!`) - use type narrowing instead**
+- [ ] No `any` types - use proper types or `unknown` with narrowing
 
 ### Architecture
 - [ ] Fits existing patterns (or has good reason not to)
@@ -152,11 +181,41 @@ Structure your review like this (see [references/review-template.md](references/
 
 ## Guidelines
 
+- **Check CLAUDE.md first** - Read project guidelines before reviewing code
 - Be specific: file:line, what's wrong, why it matters, how to fix
 - Skip style issues that linters catch
 - Explain impact, not just "this is wrong"
 - Consider trade-offs - sometimes simple is better than perfect
 - Briefly note if something is done well, but keep it short
+- **Flag project guideline violations as Important or Critical**
+
+### Checking Project Guidelines
+
+**Read CLAUDE.md before reviewing:**
+1. Check repository root: `CLAUDE.md`
+2. Check global config: `~/.claude/CLAUDE.md`
+3. Extract and check key rules during review
+
+**Common project rules to check:**
+- **Type safety:** Most projects forbid type casts (`as`), non-null assertions (`!`), and `any` types
+- **Testing requirements:** Minimum coverage, test patterns
+- **Backward compatibility:** No breaking changes without migration
+- **Code style:** Beyond what linters catch
+
+**How to flag guideline violations:**
+```markdown
+### Important
+
+**3. Type cast violates CLAUDE.md guideline**
+**File:** `app.vue:28`
+**Guideline:** "Never cast types - always narrow them"
+**Current:**
+\`\`\`typescript
+const redirect = content.entry.item as IRedirect
+\`\`\`
+**Issue:** Type assertion bypasses TypeScript safety checks
+**Fix:** Use discriminated union or type guard
+```
 
 ### Evaluating PR Quality
 
