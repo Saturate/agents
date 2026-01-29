@@ -1,11 +1,11 @@
 ---
 name: make-pr
-description: Creates pull requests on GitHub or Azure DevOps by analyzing commits and generating descriptions following CLAUDE.md style. Detects platform from git remote and uses gh CLI or az CLI. Use when asked to create PR, open PR, make pull request, submit PR, create pull request, PR workflow, or when user mentions PR creation. Generates casual, context-aware PR descriptions that explain WHY not WHAT, no robot speak.
+description: Creates pull requests on GitHub or Azure DevOps by analyzing commits and generating descriptions. Detects platform from git remote and uses gh CLI or az CLI. Use when asked to create PR, open PR, make pull request, submit PR, create pull request, PR workflow, or when user mentions PR creation. Generates casual, context-aware PR descriptions that explain WHY not WHAT.
 compatibility: Requires git repository, gh CLI for GitHub or az CLI + azure-devops extension for Azure DevOps
 allowed-tools: Bash
 metadata:
   author: Saturate
-  version: "1.1"
+  version: "1.2"
 ---
 
 You are helping the user create a pull request on GitHub or Azure DevOps. Follow these steps:
@@ -195,7 +195,7 @@ Keep title under 70 characters.
 
 ### Description Generation (if not provided)
 
-Follow the **CLAUDE.md style guide principles**:
+Follow these **style principles**:
 - **Tone:** Casual, humble engineer explaining to a peer
 - **Focus:** Explain WHY decisions were made, not WHAT the code does
 - **Avoid:** Robot speak, marketing language, obvious observations
@@ -300,4 +300,4 @@ Display:
 - The skill auto-generates good descriptions, but you can override with `--description`
 - For GitHub, link issues with "Fixes #123" in description
 - For Azure, use `--work-items` to link work items
-- Generated descriptions follow your CLAUDE.md style (casual, explains why, no fluff)
+- Generated descriptions are casual and explain why changes were made, not just what changed

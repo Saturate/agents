@@ -1,8 +1,8 @@
 # PR Description Guide
 
-This guide helps you write PR descriptions following the CLAUDE.md style conventions: casual but experienced engineer tone, explaining WHY not WHAT, no robot speak.
+This guide helps you write effective PR descriptions with a casual but experienced engineer tone, explaining WHY not WHAT, avoiding robot speak.
 
-## Core Principles (from CLAUDE.md)
+## Core Principles
 
 1. **Humble but experienced engineer tone** - You're explaining to a peer, not showing off
 2. **Casual and conversational** - Like you're talking over coffee, not writing a report
