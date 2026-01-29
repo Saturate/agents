@@ -2,21 +2,29 @@
 
 Reference for: PR Review
 
-How to extract PR information from GitHub URLs and use `gh` CLI to get branch details.
+**Purpose:** Extract branch name from GitHub PR URL and checkout the branch. That's it. Once the branch is checked out, the normal review process takes over.
 
 ## Table of Contents
 
-1. [URL Pattern Detection](#url-pattern-detection)
-2. [Prerequisites](#prerequisites)
-3. [Extracting PR Information](#extracting-pr-information)
-4. [Checkout PR Branch](#checkout-pr-branch)
-5. [Get PR Diff](#get-pr-diff)
-6. [Get PR Files Changed](#get-pr-files-changed)
-7. [Get PR Comments](#get-pr-comments)
-8. [Complete Workflow](#complete-workflow)
-9. [Error Handling](#error-handling)
-10. [Tips](#tips)
-11. [Comparison with git commands](#comparison-with-git-commands)
+1. [Quick Workflow](#quick-workflow)
+2. [URL Pattern Detection](#url-pattern-detection)
+3. [Prerequisites](#prerequisites)
+4. [Get Branch Name from PR](#get-branch-name-from-pr)
+5. [Checkout the Branch](#checkout-the-branch)
+6. [Error Handling](#error-handling)
+
+---
+
+## Quick Workflow
+
+**Goal:** Checkout the PR branch so it can be reviewed. Don't fetch diffs or commits - git will handle that.
+
+```bash
+# 1. Parse URL to get owner, repo, PR number
+# 2. Get PR info to extract branch name, title, description
+# 3. Checkout the branch using gh pr checkout
+# 4. Return to main skill for review
+```
 
 ---
 
@@ -59,124 +67,13 @@ if ! gh auth status &> /dev/null; then
 fi
 ```
 
-## Extracting PR Information
+## Get Branch Name from PR
 
-### Get PR Details
-
-```bash
-# Get PR information as JSON
-pr_info=$(gh pr view $pr_number --repo $owner/$repo --json \
-  title,body,state,headRefName,baseRefName,author,createdAt,number)
-```
-
-### Extract Branch Names
+**Step 1: Parse the URL**
 
 ```bash
-# Extract source (head) and target (base) branches
-source_branch=$(echo "$pr_info" | jq -r '.headRefName')
-target_branch=$(echo "$pr_info" | jq -r '.baseRefName')
-
-echo "PR #$pr_number: $source_branch → $target_branch"
-```
-
-### Get PR Title and Description
-
-```bash
-title=$(echo "$pr_info" | jq -r '.title')
-body=$(echo "$pr_info" | jq -r '.body')
-author=$(echo "$pr_info" | jq -r '.author.login')
-
-echo "Title: $title"
-echo "Author: @$author"
-```
-
-### Check PR State
-
-```bash
-state=$(echo "$pr_info" | jq -r '.state')
-
-case $state in
-  "OPEN")
-    echo "✅ PR is open"
-    ;;
-  "MERGED")
-    echo "⚠️ PR is already merged"
-    ;;
-  "CLOSED")
-    echo "❌ PR is closed"
-    exit 1
-    ;;
-esac
-```
-
-## Checkout PR Branch
-
-Once you have the branch name:
-
-```bash
-# Ensure we're in a git repository
-if ! git rev-parse --git-dir &> /dev/null; then
-  echo "❌ Not in a git repository"
-  exit 1
-fi
-
-# Using gh CLI to checkout PR directly
-echo "Checking out PR #$pr_number..."
-gh pr checkout $pr_number --repo $owner/$repo
-```
-
-Alternative manual checkout:
-
-```bash
-# Fetch latest from remote
-echo "Fetching latest changes..."
-git fetch origin
-
-# Check if branch exists locally
-if git rev-parse --verify "$source_branch" &> /dev/null; then
-  echo "Branch exists locally, checking out..."
-  git checkout "$source_branch"
-  git pull origin "$source_branch"
-else
-  echo "Branch doesn't exist locally, creating from remote..."
-  git checkout -b "$source_branch" "origin/$source_branch"
-fi
-```
-
-## Get PR Diff
-
-```bash
-# Get diff using gh CLI
-gh pr diff $pr_number --repo $owner/$repo
-
-# Or get specific file changes
-gh pr diff $pr_number --repo $owner/$repo -- path/to/file.js
-```
-
-## Get PR Files Changed
-
-```bash
-# List files changed in PR
-gh pr view $pr_number --repo $owner/$repo --json files --jq '.files[].path'
-```
-
-## Get PR Comments
-
-```bash
-# Get review comments
-gh pr view $pr_number --repo $owner/$repo --comments
-
-# Get specific review threads
-gh api repos/$owner/$repo/pulls/$pr_number/comments
-```
-
-## Complete Workflow
-
-```bash
-# 1. Parse URL
 url="https://github.com/facebook/react/pull/12345"
 
-# 2. Extract components
 if [[ "$url" =~ github\.com/([^/]+)/([^/]+)/pull/([0-9]+) ]]; then
   owner="${BASH_REMATCH[1]}"
   repo="${BASH_REMATCH[2]}"
@@ -185,30 +82,36 @@ else
   echo "❌ Invalid GitHub PR URL"
   exit 1
 fi
+```
 
-# 3. Get PR details
+**Step 2: Get PR information**
+
+```bash
+# Get branch name, title, and description for context
 pr_info=$(gh pr view $pr_number --repo $owner/$repo --json \
-  title,headRefName,baseRefName,state,author)
+  title,body,headRefName,author)
 
 source_branch=$(echo "$pr_info" | jq -r '.headRefName')
-target_branch=$(echo "$pr_info" | jq -r '.baseRefName')
 title=$(echo "$pr_info" | jq -r '.title')
-state=$(echo "$pr_info" | jq -r '.state')
+body=$(echo "$pr_info" | jq -r '.body')
+author=$(echo "$pr_info" | jq -r '.author.login')
 
-# 4. Verify PR is open
-if [[ "$state" != "OPEN" ]]; then
-  echo "⚠️ PR is $state"
-fi
-
-# 5. Display info
 echo "📋 PR #$pr_number: $title"
-echo "🔀 $source_branch → $target_branch"
+echo "👤 Author: @$author"
+echo "🔀 Branch: $source_branch"
+```
 
-# 6. Checkout PR
+## Checkout the Branch
+
+```bash
+# Use gh CLI to checkout - it handles forks automatically
 gh pr checkout $pr_number --repo $owner/$repo
 
-# 7. Proceed with review...
+echo "✅ Checked out $source_branch"
+# Now return to main skill to perform the review
 ```
+
+That's it. Don't fetch commits, diffs, or other PR details. Once the branch is checked out, git can provide all that information normally.
 
 ## Error Handling
 
@@ -271,62 +174,3 @@ cd react
 **Fork PRs:**
 If the PR is from a fork, `gh pr checkout` handles it automatically by adding the fork as a remote.
 
-## Tips
-
-**Quick PR checkout:**
-If you're already in the correct repository:
-```bash
-gh pr checkout 12345
-```
-
-**View PR in browser:**
-```bash
-gh pr view 12345 --web
-```
-
-**Check PR status:**
-```bash
-gh pr status
-```
-
-**List PRs:**
-```bash
-# List all open PRs
-gh pr list
-
-# List your PRs
-gh pr list --author @me
-```
-
-**Review PR:**
-```bash
-# Start a review
-gh pr review 12345
-
-# Approve PR
-gh pr review 12345 --approve
-
-# Request changes
-gh pr review 12345 --request-changes --body "Please fix X"
-```
-
-**CI Status:**
-```bash
-# Check CI status
-gh pr checks 12345
-```
-
-## Comparison with git commands
-
-**Using gh CLI:**
-```bash
-gh pr checkout 12345  # One command, handles everything
-```
-
-**Equivalent git commands:**
-```bash
-git fetch origin pull/12345/head:pr-12345
-git checkout pr-12345
-```
-
-The `gh` CLI approach is simpler and handles edge cases (forks, remote setup, etc.) automatically.

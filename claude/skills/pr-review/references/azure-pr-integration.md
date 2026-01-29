@@ -2,18 +2,30 @@
 
 Reference for: PR Review
 
-How to extract PR information from Azure DevOps URLs and use `az` CLI to get branch details.
+**Purpose:** Extract branch name from Azure DevOps PR URL and checkout the branch. That's it. Once the branch is checked out, the normal review process takes over.
 
 ## Table of Contents
 
-1. [URL Pattern Detection](#url-pattern-detection)
-2. [Prerequisites](#prerequisites)
-3. [Extracting PR Information](#extracting-pr-information)
-4. [Checkout PR Branch](#checkout-pr-branch)
-5. [Get PR Diff](#get-pr-diff)
-6. [Complete Workflow](#complete-workflow)
-7. [Error Handling](#error-handling)
-8. [Tips](#tips)
+1. [Quick Workflow](#quick-workflow)
+2. [URL Pattern Detection](#url-pattern-detection)
+3. [Prerequisites](#prerequisites)
+4. [Get Branch Name from PR](#get-branch-name-from-pr)
+5. [Checkout the Branch](#checkout-the-branch)
+6. [Error Handling](#error-handling)
+
+---
+
+## Quick Workflow
+
+**Goal:** Checkout the PR branch so it can be reviewed. Don't fetch diffs or commits - git will handle that.
+
+```bash
+# 1. Parse URL to get org, project, repo, PR number
+# 2. Configure az devops with org and project
+# 3. Get PR info to extract branch name
+# 4. Checkout the branch
+# 5. Return to main skill for review
+```
 
 ---
 
@@ -66,114 +78,13 @@ if ! az account show &> /dev/null; then
 fi
 ```
 
-## Extracting PR Information
+## Get Branch Name from PR
 
-### Get PR Details
-
-```bash
-# Set defaults for az devops commands
-az devops configure --defaults organization=https://dev.azure.com/$org project=$project
-
-# Get PR information as JSON
-pr_info=$(az repos pr show --id $pr_number --query '{
-  title: title,
-  description: description,
-  status: status,
-  sourceRefName: sourceRefName,
-  targetRefName: targetRefName,
-  createdBy: createdBy.displayName,
-  creationDate: creationDate,
-  repository: repository.name
-}' -o json)
-```
-
-### Extract Branch Names
+**Step 1: Parse the URL**
 
 ```bash
-# Extract source and target branches
-source_branch=$(echo "$pr_info" | jq -r '.sourceRefName' | sed 's|refs/heads/||')
-target_branch=$(echo "$pr_info" | jq -r '.targetRefName' | sed 's|refs/heads/||')
-
-echo "PR #$pr_number: $source_branch → $target_branch"
-```
-
-### Get PR Title and Description
-
-```bash
-title=$(echo "$pr_info" | jq -r '.title')
-description=$(echo "$pr_info" | jq -r '.description')
-author=$(echo "$pr_info" | jq -r '.createdBy')
-
-echo "Title: $title"
-echo "Author: $author"
-```
-
-### Check PR Status
-
-```bash
-status=$(echo "$pr_info" | jq -r '.status')
-
-case $status in
-  "active")
-    echo "✅ PR is active and open"
-    ;;
-  "completed")
-    echo "⚠️ PR is already completed/merged"
-    ;;
-  "abandoned")
-    echo "❌ PR is abandoned"
-    exit 1
-    ;;
-esac
-```
-
-## Checkout PR Branch
-
-Once you have the branch name:
-
-```bash
-# Ensure we're in a git repository
-if ! git rev-parse --git-dir &> /dev/null; then
-  echo "❌ Not in a git repository"
-  exit 1
-fi
-
-# Fetch latest from remote
-echo "Fetching latest changes..."
-git fetch origin
-
-# Check if branch exists locally
-if git rev-parse --verify "$source_branch" &> /dev/null; then
-  echo "Branch exists locally, checking out..."
-  git checkout "$source_branch"
-  git pull origin "$source_branch"
-else
-  echo "Branch doesn't exist locally, creating from remote..."
-  git checkout -b "$source_branch" "origin/$source_branch"
-fi
-```
-
-## Get PR Diff
-
-```bash
-# Get files changed in PR
-az repos pr show --id $pr_number --query 'lastMergeSourceCommit.commitId' -o tsv > /tmp/source_commit
-az repos pr show --id $pr_number --query 'lastMergeTargetCommit.commitId' -o tsv > /tmp/target_commit
-
-source_commit=$(cat /tmp/source_commit)
-target_commit=$(cat /tmp/target_commit)
-
-# Get diff using git
-git diff $target_commit..$source_commit
-```
-
-## Complete Workflow
-
-```bash
-# 1. Parse URL
 url="https://dev.azure.com/norriq/Accelerator/_git/CommercePlatform.Frontend/pullrequest/33325"
 
-# 2. Extract components
 if [[ "$url" =~ dev\.azure\.com/([^/]+)/([^/]+)/_git/([^/]+)/pullrequest/([0-9]+) ]]; then
   org="${BASH_REMATCH[1]}"
   project="${BASH_REMATCH[2]}"
@@ -183,26 +94,67 @@ else
   echo "❌ Invalid Azure DevOps PR URL"
   exit 1
 fi
+```
 
-# 3. Configure az devops
-az devops configure --defaults organization=https://dev.azure.com/$org project=$project
+**Step 2: Get PR information including work items**
 
-# 4. Get PR details
-pr_info=$(az repos pr show --id $pr_number -o json)
-source_branch=$(echo "$pr_info" | jq -r '.sourceRefName' | sed 's|refs/heads/||')
-target_branch=$(echo "$pr_info" | jq -r '.targetRefName' | sed 's|refs/heads/||')
+```bash
+# Get branch name, title, description, and work items for context
+pr_info=$(az repos pr show \
+  --id $pr_number \
+  --organization https://dev.azure.com/$org \
+  --project "$project" \
+  --query '{
+    branch: sourceRefName,
+    title: title,
+    description: description,
+    author: createdBy.displayName
+  }' -o json)
+
+source_branch=$(echo "$pr_info" | jq -r '.branch' | sed 's|refs/heads/||')
 title=$(echo "$pr_info" | jq -r '.title')
+description=$(echo "$pr_info" | jq -r '.description')
+author=$(echo "$pr_info" | jq -r '.author')
 
-# 5. Display info
+# Get linked work items
+work_items=$(az repos pr work-item list \
+  --id $pr_number \
+  --organization https://dev.azure.com/$org \
+  --query '[].{id: id, title: title, type: workItemType}' -o json)
+
+work_item_count=$(echo "$work_items" | jq 'length')
+
 echo "📋 PR #$pr_number: $title"
-echo "🔀 $source_branch → $target_branch"
+echo "👤 Author: $author"
+echo "🔀 Branch: $source_branch"
+echo "🔗 Work Items: $work_item_count linked"
 
-# 6. Checkout branch
+# Display work items if any
+if [ "$work_item_count" -gt 0 ]; then
+  echo "$work_items" | jq -r '.[] | "  - #\(.id) [\(.type)] \(.title)"'
+fi
+```
+
+**Evaluating work items in review:**
+- Bug fix PRs should link to Bug work items
+- Feature PRs should link to User Story or Feature work items
+- No work items = ask if one should be created/linked
+- Wrong type = suggest appropriate work item type
+
+**Important:** Don't use `az devops configure --defaults` with `--project` - it doesn't work. Always use `--organization` and `--project` as explicit parameters to each command.
+
+## Checkout the Branch
+
+```bash
+# Fetch and checkout the branch
 git fetch origin
 git checkout -b "$source_branch" "origin/$source_branch" 2>/dev/null || git checkout "$source_branch"
 
-# 7. Proceed with review...
+echo "✅ Checked out $source_branch"
+# Now return to main skill to perform the review
 ```
+
+That's it. Don't fetch commits, diffs, or other PR details. Once the branch is checked out, git can provide all that information normally.
 
 ## Error Handling
 
@@ -253,16 +205,3 @@ Clone the correct repository first:
 git clone git@ssh.dev.azure.com:v3/{org}/{project}/CommercePlatform.Frontend
 ```
 
-## Tips
-
-**Caching organization/project:**
-If reviewing multiple PRs from the same project, set defaults once:
-```bash
-az devops configure --defaults organization=https://dev.azure.com/norriq project=Accelerator
-```
-
-**URL encoding:**
-Azure DevOps project names with spaces are URL-encoded in URLs. The `az` CLI handles this automatically.
-
-**Permissions:**
-You need at least "Read" permissions on the repository to view PR details.

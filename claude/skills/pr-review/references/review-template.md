@@ -7,17 +7,37 @@ Use this template structure for code review outputs.
 ## Table of Contents
 
 1. [Summary](#summary)
-2. [Critical](#critical)
-3. [Important](#important)
-4. [Minor](#minor)
-5. [Questions](#questions)
-6. [Prevent This](#prevent-this)
-7. [Positive Notes](#positive-notes)
+2. [PR Quality](#pr-quality)
+3. [Critical](#critical)
+4. [Important](#important)
+5. [Minor](#minor)
+6. [Questions](#questions)
+7. [Prevent This](#prevent-this)
+8. [Positive Notes](#positive-notes)
 
 ---
 
 ## Summary
 Good to merge with minor fixes
+
+## PR Quality
+
+### Title
+✅ Clear and descriptive: "Fix race condition in payment processing"
+
+### Description
+✅ Explains the problem (double charges on rapid clicks) and solution (disabled button + idempotency keys)
+
+### Work Items (Azure DevOps)
+✅ Linked to Bug #12345 "Payment processed twice on rapid button clicks"
+- Appropriate work item type for a bug fix
+
+### Screenshots
+⚠️ This changes the checkout button behavior but has no screenshots showing the disabled state. Please add a screenshot showing:
+- Button in normal state
+- Button in processing/disabled state
+
+---
 
 ## Critical
 
@@ -155,3 +175,99 @@ Add `tsc --noEmit` to CI pipeline to ensure type errors are caught automatically
 - Good test coverage for the happy path
 - Clear variable names throughout
 - Proper use of TypeScript types
+
+---
+
+## Example: Poor PR Quality Feedback
+
+When PR title/description is lacking:
+
+### Summary
+Has issues - needs better PR documentation before code review
+
+### PR Quality
+
+**Title:** ❌ "fix" - This is too vague. What was fixed?
+- Suggestion: "Fix OAuth redirect loop in Safari" or "Fix payment double-charge race condition"
+
+**Description:** ❌ Empty description on a 15-file PR with complex logic changes
+- Need: Explain WHY these changes were needed
+- Need: What problem did this solve?
+- Need: Any non-obvious implementation decisions?
+- Need: How was this tested?
+
+**Screenshots:** ❌ This PR changes 3 UI components but has no screenshots
+- Please add before/after screenshots for:
+  - Login modal (src/components/LoginModal.tsx)
+  - Checkout button (src/components/CheckoutButton.tsx)
+  - Profile page (src/pages/Profile.tsx)
+
+**Work Items (Azure DevOps):** ❌ No work items linked
+- This appears to be a bug fix - should link to a Bug work item
+- If no work item exists, create one to track this fix
+- This helps with traceability and release notes
+
+**Breaking changes:** ⚠️ This changes the API signature of `processPayment()` but doesn't call it out
+- Add a "⚠️ Breaking Change" section to description
+- Document migration path for existing callers
+
+---
+
+## Example: Good PR Quality
+
+When PR is well documented:
+
+### PR Quality
+
+**Title:** ✅ "Add server-side rendering for product pages"
+
+**Description:** ✅ Clear context:
+- Explains current problem (SEO and initial load time)
+- Explains solution approach (SSR with Next.js)
+- Notes trade-offs (increased server load, acceptable due to low traffic)
+- Links performance comparison
+
+**Screenshots:** ✅ Includes:
+- Lighthouse scores before/after
+- Network waterfall comparison
+- First contentful paint metrics
+
+**Work Items (Azure DevOps):** ✅ Linked to:
+- User Story #5678 "Improve SEO for product pages"
+- Task #5679 "Implement SSR for products"
+- Appropriate work items for a feature implementation
+
+**Documentation:** ✅ Updated README with SSR deployment requirements
+
+---
+
+## Example: Work Item Evaluation (Azure DevOps)
+
+**Scenario 1: Missing work items**
+```
+### PR Quality
+
+**Work Items:** ❌ No work items linked
+- This is a significant change (15 files) but has no work items
+- Recommendation: Create a User Story or Feature work item to track this work
+- Link format: `az repos pr work-item add --id <pr-id> --work-items <item-id>`
+```
+
+**Scenario 2: Wrong work item type**
+```
+### PR Quality
+
+**Work Items:** ⚠️ Linked to Task #9999
+- This appears to be a bug fix (race condition) but is linked to a Task
+- Recommendation: Link to or create a Bug work item instead
+- Tasks are for planned work, Bugs are for defects
+```
+
+**Scenario 3: Good work item linkage**
+```
+### PR Quality
+
+**Work Items:** ✅ Properly linked
+- Bug #1234 "Race condition in payment processing" - appropriate for this fix
+- Includes reproduction steps and customer impact in work item
+```

@@ -90,6 +90,16 @@ fi
 
 Use this checklist to guide your review. Need examples of what to look for? Check out [references/common-issues.md](references/common-issues.md) for code patterns.
 
+### PR Quality (Review First)
+- [ ] Title is clear and descriptive (not "fix bug" or "update code")
+- [ ] Description explains WHY, not just WHAT
+- [ ] Complex changes have explanation or context
+- [ ] Visual changes include screenshots/recordings
+- [ ] Breaking changes are clearly marked
+- [ ] Related issues/tickets are linked (GitHub) or work items linked (Azure DevOps)
+- [ ] Work items are appropriate for the changes (Azure DevOps)
+- [ ] Description helps reviewers understand impact
+
 ### Security (Critical)
 - [ ] Input validation and sanitization
 - [ ] SQL injection, XSS, command injection risks
@@ -132,6 +142,7 @@ Use this checklist to guide your review. Need examples of what to look for? Chec
 Structure your review like this (see [references/review-template.md](references/review-template.md) for detailed examples):
 
 - **Summary:** One line verdict (Good to merge / Has issues / Needs work)
+- **PR Quality:** Evaluate title, description, screenshots (review this first)
 - **Critical:** Security, data loss, crashes - must fix before merge
 - **Important:** Bugs, performance, missing tests - should fix
 - **Minor:** Quality improvements - nice to have
@@ -146,6 +157,49 @@ Structure your review like this (see [references/review-template.md](references/
 - Explain impact, not just "this is wrong"
 - Consider trade-offs - sometimes simple is better than perfect
 - Briefly note if something is done well, but keep it short
+
+### Evaluating PR Quality
+
+**Title:**
+- ❌ Bad: "fix", "update", "changes", "wip"
+- ✅ Good: "Fix OAuth redirect loop in Safari", "Add rate limiting to auth endpoints"
+
+**Description:**
+- Should explain WHY, not just list what changed (diff shows that)
+- Complex logic needs context: "Chose X over Y because..."
+- Breaking changes must be highlighted
+- For UI changes: screenshots/videos are expected
+- Link related issues (GitHub): "Fixes #123", "Related to #456"
+- Link work items (Azure DevOps): Should have appropriate work items linked
+
+**Work Items (Azure DevOps only):**
+- PRs should link to relevant work items (User Stories, Bugs, Tasks)
+- Bug fixes → should link to Bug work item
+- Features → should link to User Story or Feature work item
+- No work items linked → ask if one should be created/linked
+- Wrong work item type → suggest appropriate type
+
+**When to ask for improvements:**
+- Title is vague or uninformative
+- No description on non-trivial changes
+- UI changes without screenshots
+- Breaking changes not called out
+- Missing context on non-obvious decisions
+- No work items linked (Azure DevOps) when they should be
+
+**Example feedback:**
+```
+## PR Quality
+
+**Title:** ⚠️ Too generic. Consider: "Fix race condition in payment processing"
+
+**Description:** ❌ Missing context. Why did we switch from polling to SSE? What problem did it solve? Add:
+- What was broken/slow before
+- Why this approach vs alternatives
+- Performance impact (if relevant)
+
+**Screenshots:** ❌ This changes the checkout UI but has no screenshots. Add before/after screenshots.
+```
 
 ### Suggesting Future Mitigations
 
