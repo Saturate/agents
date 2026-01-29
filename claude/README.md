@@ -16,7 +16,7 @@ Initialize local development environment from Azure DevOps by cloning all projec
 **Requirements:** Azure DevOps MCP connection and Git
 
 ### `/make-pr` - Pull Request Creation
-Creates pull requests on GitHub or Azure DevOps with smart platform detection and auto-generated descriptions. Analyzes your commits to generate PR titles and descriptions following CLAUDE.md style: casual engineer tone, explains WHY not WHAT, no robot speak. Supports reviewers, labels (GitHub), work items (Azure), and draft PRs.
+Creates pull requests on GitHub or Azure DevOps with auto-generated titles and descriptions. Detects platform from git remote, analyzes commits, and generates context-aware PR content. Supports reviewers, labels (GitHub), work items (Azure), and draft PRs.
 
 **Requirements:** Git repository with `gh` CLI (GitHub) or `az` CLI + azure-devops extension (Azure DevOps)
 
