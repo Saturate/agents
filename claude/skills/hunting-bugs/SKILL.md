@@ -1,5 +1,5 @@
 ---
-name: bug-hunt
+name: hunting-bugs
 description: Audits codebases for common bug patterns and anti-patterns including timezone issues, null safety, type coercion, async handling, and performance problems. Searches for known problematic patterns and provides actionable fixes. Use when asked to find bugs, audit for issues, check for common problems, or hunt for bugs in codebase.
 compatibility: Requires Read, Grep, Glob tools for code analysis
 allowed-tools: Read, Grep, Glob, Bash
