@@ -40,7 +40,7 @@ The skill accepts optional arguments to determine what to review:
    - Backward compatibility rules
 
 **Common patterns to extract:**
-```bash
+```text
 # Look for type safety rules
 grep -i "never cast\|no any\|no type assertion" CLAUDE.md ~/.claude/CLAUDE.md
 
@@ -64,7 +64,7 @@ If no CLAUDE.md exists, proceed with general best practices only.
 **If arguments provided:**
 
 **1. Detect if URL:**
-```bash
+```text
 if [[ "$args" =~ ^https?:// ]]; then
   # It's a URL, determine platform
   if [[ "$args" =~ github\.com ]]; then
@@ -87,7 +87,7 @@ fi
 ```
 
 **2. If not URL, treat as branch name:**
-```bash
+```text
 # Fetch latest changes
 git fetch origin
 
@@ -104,7 +104,7 @@ fi
 ```
 
 **3. Verify we're on a branch (not detached HEAD):**
-```bash
+```text
 current_branch=$(git branch --show-current)
 if [ -z "$current_branch" ]; then
   echo "❌ Detached HEAD state - cannot review"
@@ -158,8 +158,8 @@ Use this checklist to guide your review. Need examples of what to look for? Chec
 - [ ] Duplication worth extracting
 - [ ] Names match what they do
 - [ ] **Follows project guidelines in CLAUDE.md (if present)**
-- [ ] **No type casts/assertions (`as`, `!`) - use type narrowing instead**
-- [ ] No `any` types - use proper types or `unknown` with narrowing
+- [ ] **No type casts or non-null assertions - use type narrowing instead**
+- [ ] No "any" types - use proper types or "unknown" with narrowing
 
 ### Architecture
 - [ ] Fits existing patterns (or has good reason not to)
@@ -197,7 +197,7 @@ Structure your review like this (see [references/review-template.md](references/
 3. Extract and check key rules during review
 
 **Common project rules to check:**
-- **Type safety:** Most projects forbid type casts (`as`), non-null assertions (`!`), and `any` types
+- **Type safety:** Most projects forbid type casts (as), non-null assertions (!), and "any" types
 - **Testing requirements:** Minimum coverage, test patterns
 - **Backward compatibility:** No breaking changes without migration
 - **Code style:** Beyond what linters catch
