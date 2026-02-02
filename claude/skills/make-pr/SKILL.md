@@ -5,7 +5,7 @@ compatibility: Requires git repository, gh CLI for GitHub or az CLI + azure-devo
 allowed-tools: Bash
 metadata:
   author: Saturate
-  version: "1.2"
+  version: "1.3"
 ---
 
 You are helping the user create a pull request on GitHub or Azure DevOps. Follow these steps:
@@ -21,8 +21,9 @@ PR Creation Progress:
 - [ ] Step 2: Got current state (branch, remote, target branch)
 - [ ] Step 3: Analyzed commits (found commits to PR)
 - [ ] Step 4: Generated PR title and description
-- [ ] Step 5: Created PR successfully
-- [ ] Step 6: Displayed PR URL and details
+- [ ] Step 5: Confirmed PR content with user
+- [ ] Step 6: Created PR successfully
+- [ ] Step 7: Displayed PR URL and details
 ```
 
 ## Step 0: Prerequisites Check
@@ -230,7 +231,45 @@ Follow these **style principles**:
 
 See [references/pr-description-guide.md](references/pr-description-guide.md) for detailed guidance and examples.
 
-## Step 5: Create the PR
+## Step 5: Confirm PR Content with User
+
+Before creating the PR, display the generated content and ask for confirmation.
+
+**Display the PR details:**
+
+```
+Pull Request Preview
+====================
+
+Title: [generated or provided title]
+
+Description:
+[generated or provided description]
+
+Details:
+- Source: [current_branch]
+- Target: [target_branch]
+- Draft: [yes/no]
+- Reviewers: [list if any]
+- Labels/Work Items: [list if any]
+```
+
+**Ask for confirmation using AskUserQuestion:**
+
+Ask the user: "Ready to create this pull request?"
+
+Options:
+1. "Yes, create it" → Proceed to Step 6
+2. "Edit title/description" → Allow user to provide revised title and/or description, then show preview again
+3. "Cancel" → Exit without creating PR
+
+If user chooses to edit:
+- Ask them to provide the updated title and/or description
+- Update the variables with their input
+- Show the preview again with updated content
+- Ask for confirmation again
+
+## Step 6: Create the PR
 
 ### GitHub
 
@@ -269,7 +308,7 @@ az repos pr create --title "$title" --description "$description" \
 
 See [references/azure-pr.md](references/azure-pr.md) for detailed options and troubleshooting.
 
-## Step 6: Output Result
+## Step 7: Output Result
 
 Display:
 - PR URL
