@@ -1,8 +1,0 @@
-{
-  "name": "azure-devops-init",
-  "description": "Initialize local development environment from Azure DevOps projects by cloning all repositories",
-  "version": "1.0.0",
-  "author": {
-    "name": "Local"
-  }
-}

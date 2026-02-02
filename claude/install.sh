@@ -23,7 +23,7 @@ SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
 # Define source files and target directory
 SOURCE_FILES=("CLAUDE.md" "settings.json" "statusline-command.sh")
-SKILL_DIRS=("pr-review" "codebase-audit")
+SKILL_DIRS=("pr-review" "codebase-audit" "azure-init" "hunting-bugs" "make-pr" "validate-skill")
 TARGET_DIR="$HOME/.claude"
 
 # Parse command line flags

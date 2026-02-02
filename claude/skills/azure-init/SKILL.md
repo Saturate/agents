@@ -1,16 +1,28 @@
 ---
 name: azure-init
 description: Initialize local dev environment from Azure DevOps by cloning all project repositories. Use when user asks to "initialize Azure project", "clone Azure repos", "setup Azure project locally", or wants to download all repositories from an Azure DevOps project.
-compatibility: Requires Azure DevOps MCP connection and Git
+compatibility: Requires Azure CLI (with az devops extension) OR Azure DevOps MCP, and Git
 allowed-tools: Bash
 metadata:
   author: alkj
-  version: "1.0.0"
+  version: "2.1.0"
 ---
 
 # Azure DevOps Project Initialization
 
 Initialize a local development environment from an Azure DevOps project by cloning all repositories.
+
+## Table of Contents
+
+1. [Overview](#overview)
+2. [Arguments](#arguments)
+3. [Instructions](#instructions) - Steps 0-8
+4. [Optional Flags](#optional-flags)
+5. [Example Usage](#example-usage)
+6. [Example Output](#example-output)
+7. [Error Handling](#error-handling)
+8. [Prerequisites](#prerequisites)
+9. [Reference Materials](#reference-materials)
 
 ## Overview
 
@@ -24,11 +36,26 @@ This skill helps users quickly set up a local development environment by:
 
 When invoked, parse the arguments as follows:
 - **First argument** (required): Project name or ID
-- **Second argument** (optional): Target directory path (defaults to `~/code/{sanitized-project-name}`)
+- **Second argument** (optional): Target directory path (auto-detected from current location if not provided)
 
 ## Instructions
 
-Follow these steps when this skill is activated:
+Follow these steps when this skill is activated.
+
+**Copy this checklist to track progress:**
+
+```
+Azure DevOps Initialization Progress:
+- [ ] Step 0: Verify prerequisites (Git, Azure CLI/MCP)
+- [ ] Step 1: Parse arguments
+- [ ] Step 2: Find the project
+- [ ] Step 3: List repositories
+- [ ] Step 4: Determine target directory
+- [ ] Step 5: Create directory structure
+- [ ] Step 6: Clone repositories
+- [ ] Step 7: Verify and report
+- [ ] Step 8: Handle any failures
+```
 
 ### 0. Verify Prerequisites
 
@@ -39,15 +66,29 @@ Follow these steps when this skill is activated:
 2. If not found, inform user: "Git is not installed. Install it with your package manager (brew install git, apt install git, etc.)"
 3. Exit if git is unavailable
 
-**Check MCP Connection:**
-1. Try to call `mcp__azure-devops__core_list_projects` (with no parameters)
-2. If the call succeeds: Continue to step 1
-3. If the call fails with "Unknown tool" or similar error:
-   - Inform user: "Azure DevOps MCP is not installed or connected"
-   - Provide setup instructions (see MCP Setup section below)
-   - Exit gracefully
+**Check Azure DevOps Access (Azure CLI preferred, MCP fallback):**
 
-**Note:** The MCP tool names referenced here (`mcp__azure-devops__core_list_projects`, `mcp__azure-devops__repo_list_repos_by_project`) should match your actual Azure DevOps MCP server implementation. Verify these with your MCP server documentation.
+**Try Azure CLI first:**
+1. Check if `az` is available: `az --version 2>/dev/null`
+2. If found:
+   - Check for azure-devops extension: `az extension show -n azure-devops 2>/dev/null`
+   - If extension missing, install it: `az extension add -n azure-devops`
+   - Check if default org is configured: `az devops configure --list | grep organization`
+   - If no default org found:
+     - Ask user: "What is your Azure DevOps organization name?" (use AskUserQuestion)
+     - Configure: `az devops configure --defaults organization=https://dev.azure.com/{user-provided-org}`
+   - Test: `az devops project list 2>&1`
+   - If successful: Use Azure CLI mode for steps 2-3
+   - If auth fails: Guide user to run `az login` (READ references/az-cli-installation.md)
+
+**Fall back to MCP if Azure CLI not available:**
+1. Try calling `mcp_ado_core_list_projects` (no parameters)
+2. If tool exists and succeeds: Use MCP mode for steps 2-3
+3. If tool fails or doesn't exist:
+   - Inform user neither Azure CLI nor MCP is available
+   - READ references/az-cli-installation.md (recommended) OR references/mcp-installation.md
+   - Provide quick install options for both
+   - Exit gracefully
 
 ### 1. Parse Arguments
 
@@ -57,28 +98,56 @@ Extract the project identifier and optional target directory from the args strin
 
 ### 2. Find the Project
 
-- Use `mcp__azure-devops__core_list_projects` to retrieve all projects
-- Search for the project by name (case-insensitive partial match)
+**If using Azure CLI mode:**
+- Use `az devops project list --output json`
+- Parse JSON and search for project by name (case-insensitive partial match)
+- Extract: project name, organization from configured default
+
+**If using MCP mode:**
+- Use `mcp_ado_core_list_projects`
+- Search for project by name (case-insensitive partial match)
+- Extract: project ID, project name, organization from project URL
+
+**Common handling:**
 - If exact match not found, look for partial matches and ask user to clarify
 - If still not found, list available projects matching the search term
-- Extract from the project object:
-  - **Project ID**: For listing repositories
-  - **Project name**: For building git URLs
-  - **Organization**: From the project's URL property or organization field (needed for SSH URLs)
-  - Example: If project URL is `https://dev.azure.com/acmecorp/Platform%20Services`, organization is `acmecorp`
 
 ### 3. List Repositories
 
-- Use `mcp__azure-devops__repo_list_repos_by_project` with the project ID
-- Display the repositories found with their names and sizes
-- If no repositories found, inform the user and exit
+**If using Azure CLI mode:**
+- Use `az repos list --project "PROJECT-NAME" --output json`
+- Parse JSON to get repository names, IDs, metadata
+
+**If using MCP mode:**
+- Use `mcp_ado_repo_list_repos_by_project` with project ID
+- Get repository names, IDs, metadata from response
+
+**Common handling:**
+- Display repositories found with their names (and sizes if available)
+- If no repositories found, inform user and exit
 
 ### 4. Determine Target Directory
 
 **If target directory was provided in args:**
 - Use it as-is
 
-**If NOT provided, determine based on repository namespacing:**
+**If NOT provided, detect base directory:**
+
+1. **Detect current working directory** and check if it matches recognized code directory patterns:
+   - `~/code/`, `~/git/`, `~/projects/`, `~/src/`, `~/dev/`, `~/repos/`
+   - Run: `pwd` to get current directory
+   - If current directory starts with any of these patterns, extract the base directory
+   - Example: If `pwd` returns `/Users/you/git/some-project`, use `~/git/` as base
+
+2. **If no recognized pattern found**, ask user where to clone using AskUserQuestion:
+   - Question: "Where would you like to clone the repositories?"
+   - Options:
+     - Current directory: `$(pwd)`
+     - Home code directory: `~/code/`
+     - Custom path: (user provides custom path)
+   - Use the selected path as the base directory
+
+3. **Now determine structure based on repository namespacing:**
 
 **Check if repositories are properly namespaced:**
 - A repo is "properly namespaced" if its name contains namespace separator (`.` or `-`) and has 2+ segments
@@ -93,10 +162,10 @@ Extract the project identifier and optional target directory from the args strin
 
 **Decision logic:**
 1. Check first 3-5 repositories in the list
-2. If ALL are properly namespaced → Place directly in `~/code/`
-   - Each repo goes to: `~/code/{sanitized-repo-name}`
+2. If ALL are properly namespaced → Place directly in base directory
+   - Each repo goes to: `{base-dir}/{sanitized-repo-name}`
 3. If ANY are NOT properly namespaced → Use project folder structure
-   - Each repo goes to: `~/code/{sanitized-project-name}/{sanitized-repo-name}`
+   - Each repo goes to: `{base-dir}/{sanitized-project-name}/{sanitized-repo-name}`
 
 **Sanitization rules** (apply to all directory names):
 - Replace spaces with hyphens
@@ -111,21 +180,21 @@ Extract the project identifier and optional target directory from the args strin
 
 **Based on the namespacing decision from step 4:**
 
-- If placing directly in `~/code/`: No parent directory needed
-- If using project folder: Create `~/code/{sanitized-project-name}/`
+- If placing directly in base directory: No parent directory needed
+- If using project folder: Create `{base-dir}/{sanitized-project-name}/`
 - Use `mkdir -p` to create parent directories as needed
 
 **Inform the user of the decision:**
 ```
 Repository naming analysis:
 ✓ Repositories are properly namespaced (e.g., Acme.Platform.Api)
-→ Placing directly in ~/code/
+→ Placing directly in {base-dir}/
 
 or
 
 Repository naming analysis:
 ⚠ Repositories are not namespaced (e.g., Api, Frontend)
-→ Organizing in project folder: ~/code/platform-services/
+→ Organizing in project folder: {base-dir}/platform-services/
 ```
 
 ### 6. Clone Repositories
@@ -145,8 +214,8 @@ For each repository:
 - Example: "My Repo" → "my-repo" (for directory), but "My%20Repo" in URL
 
 **Determine full clone path:**
-- If repos are properly namespaced: `~/code/{sanitized-repo-name}`
-- If repos are NOT namespaced: `~/code/{sanitized-project-name}/{sanitized-repo-name}`
+- If repos are properly namespaced: `{base-dir}/{sanitized-repo-name}`
+- If repos are NOT namespaced: `{base-dir}/{sanitized-project-name}/{sanitized-repo-name}`
 
 **Check if directory already exists:**
 - Check if the full clone path exists
@@ -161,7 +230,7 @@ For each repository:
 **Error handling for clone failures:**
 - If clone fails with "Permission denied (publickey)":
   - Inform user SSH keys are not configured
-  - Provide SSH setup instructions (see SSH Setup section)
+  - READ references/az-cli-installation.md for SSH setup instructions
   - Ask: "Continue with remaining repos? (y/n)"
   - If no: exit and suggest cleanup (see Cleanup on Failure section)
 - If clone fails with other error:
@@ -181,7 +250,7 @@ For each repository:
   - Number of repositories cloned successfully
   - Number of repositories skipped (already existed)
   - Number of repositories failed (if any)
-  - Full path to the location (either project folder or ~/code)
+  - Full path to the location (either project folder or base directory)
   - Next steps suggestion with path to a primary repository
 
 ### 8. Cleanup on Failure
@@ -190,30 +259,30 @@ If the process exits early (MCP issues, SSH failures, network errors), inform th
 
 **Partial clone scenario (non-namespaced repos):**
 ```
-⚠️  Clone process incomplete. Current state:
+Clone process incomplete. Current state:
 - Successfully cloned: 3 repositories
 - Failed/Skipped: 5 repositories
-- Location: ~/code/platform-services
+- Location: {base-dir}/platform-services
 
 Options:
 1. Fix the issue (SSH keys, network) and run /azure-init again
    - Already cloned repos will be skipped automatically
-2. Remove partial setup: rm -rf ~/code/platform-services
-3. Continue manually: cd ~/code/platform-services and clone remaining repos
+2. Remove partial setup: rm -rf {base-dir}/platform-services
+3. Continue manually: cd {base-dir}/platform-services and clone remaining repos
 ```
 
 **Partial clone scenario (namespaced repos):**
 ```
-⚠️  Clone process incomplete. Current state:
+Clone process incomplete. Current state:
 - Successfully cloned: 2 repositories
 - Failed/Skipped: 3 repositories
-- Location: ~/code (acme.platform.api, acme.platform.frontend)
+- Location: {base-dir} (acme.platform.api, acme.platform.frontend)
 
 Options:
 1. Fix the issue (SSH keys, network) and run /azure-init again
    - Already cloned repos will be skipped automatically
-2. Remove partial clones: rm -rf ~/code/acme.platform.*
-3. Continue manually: clone remaining repos to ~/code
+2. Remove partial clones: rm -rf {base-dir}/acme.platform.*
+3. Continue manually: clone remaining repos to {base-dir}
 ```
 
 Always provide clear next steps so users know how to proceed or clean up.
@@ -242,16 +311,17 @@ This lets users preview what will happen before committing to large clones.
 
 ```bash
 /azure-init "Platform Services"
+# Auto-detects base directory from current location (~/code/, ~/git/, ~/projects/, etc.)
 # If repos are NOT namespaced (Api, Frontend, etc.):
-#   → Clones to ~/code/platform-services/api, ~/code/platform-services/frontend, etc.
+#   → Clones to {base-dir}/platform-services/api, {base-dir}/platform-services/frontend, etc.
 # If repos ARE namespaced (Acme.Platform.Api, Acme.Platform.Frontend, etc.):
-#   → Clones to ~/code/acme.platform.api, ~/code/acme.platform.frontend, etc.
+#   → Clones to {base-dir}/acme.platform.api, {base-dir}/acme.platform.frontend, etc.
 
 /azure-init "Platform Services" ~/projects/platform
-# Clones to ~/projects/platform/ (overrides automatic directory decision)
+# Clones to ~/projects/platform/ (overrides automatic directory detection)
 
 /azure-init 0d1e562b-95af-4c55-a8ce-8f26508d50ed
-# Uses project ID directly, applies same namespacing logic
+# Uses project ID directly, applies same namespacing logic with auto-detected base dir
 
 /azure-init "Platform Services" --dry-run
 # Preview what would be cloned without actually cloning
@@ -259,96 +329,16 @@ This lets users preview what will happen before committing to large clones.
 
 ## Example Output
 
-### Example 1: Non-namespaced repos (uses project folder)
-
-```
-✓ Git is installed (version 2.39.0)
-✓ Azure DevOps MCP is connected
-
-Finding project "Platform Services"...
-✓ Found: Platform Services (ID: 0d1e562b-95af-4c55-a8ce-8f26508d50ed)
-
-Listing repositories...
-Found 4 repositories:
-  - Api (125 MB)
-  - Frontend (89 MB)
-  - Infrastructure (12 MB)
-  - Docs (5 MB)
-
-Repository naming analysis:
-⚠ Repositories are not namespaced (e.g., Api, Frontend)
-→ Organizing in project folder: ~/code/platform-services/
-
-Cloning repositories...
-[1/4] Cloning Api...
-✓ Cloned Api → ~/code/platform-services/api
-
-[2/4] Cloning Frontend...
-✓ Cloned Frontend → ~/code/platform-services/frontend
-
-[3/4] Cloning Infrastructure...
-⊘ Skipped Infrastructure (already exists)
-
-[4/4] Cloning Docs...
-✓ Cloned Docs → ~/code/platform-services/docs
-
-Summary:
-✓ Successfully cloned: 3 repositories
-⊘ Skipped: 1 repository
-✗ Failed: 0 repositories
-
-Location: ~/code/platform-services
-
-Next steps:
-  cd ~/code/platform-services/api
-```
-
-### Example 2: Properly namespaced repos (directly in ~/code)
-
-```
-✓ Git is installed (version 2.39.0)
-✓ Azure DevOps MCP is connected
-
-Finding project "Acme Platform"...
-✓ Found: Acme Platform (ID: a1b2c3d4-...)
-
-Listing repositories...
-Found 3 repositories:
-  - Acme.Platform.Api (145 MB)
-  - Acme.Platform.Frontend (210 MB)
-  - Acme.Platform.Hosting (18 MB)
-
-Repository naming analysis:
-✓ Repositories are properly namespaced (e.g., Acme.Platform.Api)
-→ Placing directly in ~/code/
-
-Cloning repositories...
-[1/3] Cloning Acme.Platform.Api...
-✓ Cloned Acme.Platform.Api → ~/code/acme.platform.api
-
-[2/3] Cloning Acme.Platform.Frontend...
-✓ Cloned Acme.Platform.Frontend → ~/code/acme.platform.frontend
-
-[3/3] Cloning Acme.Platform.Hosting...
-✓ Cloned Acme.Platform.Hosting → ~/code/acme.platform.hosting
-
-Summary:
-✓ Successfully cloned: 3 repositories
-⊘ Skipped: 0 repositories
-✗ Failed: 0 repositories
-
-Location: ~/code
-
-Next steps:
-  cd ~/code/acme.platform.api
-```
+See [references/examples.md](references/examples.md) for detailed example outputs showing both namespaced and non-namespaced repository scenarios.
 
 ## Error Handling
 
 Handle common errors gracefully. For detailed error messages and setup instructions, see [references/troubleshooting.md](references/troubleshooting.md).
 
 **Common error scenarios:**
-- **MCP not available**: Guide user through MCP setup
+- **Azure CLI not installed**: Guide user through Azure CLI installation
+- **az devops extension missing**: Auto-install with `az extension add -n azure-devops`
+- **Authentication failed**: Guide user to run `az login` or configure PAT
 - **SSH not configured**: Provide SSH key generation and setup instructions
 - **Project not found**: List available projects or suggest search improvements
 - **Clone failures**: Report which repository failed and why
@@ -356,21 +346,56 @@ Handle common errors gracefully. For detailed error messages and setup instructi
 
 ## Prerequisites
 
-✅ **Required:**
+**Required:**
 - Git must be installed and available
-- Azure DevOps MCP connection must be active
-- SSH authentication must be configured for Azure DevOps
+- **Either** Azure CLI with `azure-devops` extension **OR** Azure DevOps MCP server
+- Azure DevOps authentication configured
+- SSH authentication for cloning repositories
 
-🔍 **Automatic verification** happens in step 0 - See [references/troubleshooting.md](references/troubleshooting.md) for detailed setup instructions
+**Automatic verification** happens in step 0
+
+**Setup guides:**
+- Azure CLI installation (recommended): [references/az-cli-installation.md](references/az-cli-installation.md)
+- MCP installation (alternative): [references/mcp-installation.md](references/mcp-installation.md)
+- Troubleshooting: [references/troubleshooting.md](references/troubleshooting.md)
+
+## Reference Materials
+
+When needed during execution, READ these guides:
+
+- **Azure CLI setup**: [references/az-cli-installation.md](references/az-cli-installation.md)
+  - Installation steps for macOS, Linux, Windows
+  - Azure DevOps extension setup
+  - Authentication configuration
+  - SSH key setup for cloning
+
+- **MCP setup**: [references/mcp-installation.md](references/mcp-installation.md)
+  - Quick installation command
+  - When to use MCP vs Azure CLI
+  - Authentication flow
+
+- **Troubleshooting**: [references/troubleshooting.md](references/troubleshooting.md)
+  - Azure DevOps access issues
+  - SSH configuration problems
+  - Common errors and solutions
+
+- **Examples**: [references/examples.md](references/examples.md)
+  - Example output for non-namespaced repositories
+  - Example output for properly namespaced repositories
 
 ## Notes
+
+**Directory detection:**
+- The skill auto-detects your preferred code directory by checking if you're in a recognized pattern (~/code/, ~/git/, ~/projects/, ~/src/, ~/dev/, ~/repos/)
+- If not in a recognized directory, it asks you where to clone repositories
+- You can always override by providing a custom target directory as the second argument
 
 **Namespacing logic:**
 - The skill automatically detects if repositories are properly namespaced
 - **Properly namespaced** = Contains `.` or `-` separator with 2+ segments (e.g., `Acme.Platform.Api`, `Contoso-DataHub`)
-- Namespaced repos go directly to `~/code/{repo-name}` (flat structure)
-- Non-namespaced repos go to `~/code/{project-name}/{repo-name}` (nested structure)
-- This keeps your ~/code folder organized and consistent with established patterns
+- Namespaced repos go directly to `{base-dir}/{repo-name}` (flat structure)
+- Non-namespaced repos go to `{base-dir}/{project-name}/{repo-name}` (nested structure)
+- This keeps your code folder organized and consistent with established patterns
 
 **General behavior:**
 - Repositories that already exist (with `.git` folder) will be skipped (not re-cloned)
