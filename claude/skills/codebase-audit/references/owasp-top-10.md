@@ -362,3 +362,8 @@ grep -rn "exec\(.*req\.\|spawn\(" --include="*.js" . # Command injection
 - [OWASP Top 10 2021](https://owasp.org/www-project-top-ten/)
 - [OWASP Cheat Sheets](https://cheatsheetseries.owasp.org/)
 - [CWE Top 25](https://cwe.mitre.org/top25/)
+
+**.NET-specific security patterns:**
+- [.NET Security: Authentication & Authorization](dotnet-security-auth.md) - Auth, authz, CSRF, and redirect validation
+- [.NET Security: Data Security](dotnet-security-data.md) - SQL injection, deserialization, mass assignment, input validation
+- [.NET Security: Cryptography](dotnet-security-crypto.md) - Secrets management, cryptographic failures, security headers

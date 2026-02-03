@@ -29,6 +29,7 @@ Check for lock files to determine package manager:
 | `requirements.txt` / `poetry.lock` | pip/poetry | `pip-audit --format json` or `safety check --json` |
 | `Cargo.toml` | cargo | `cargo audit --json` |
 | `go.mod` | go | `go list -json -m all \| nancy sleuth` |
+| `*.csproj` (PackageReference) | NuGet | `dotnet list package --vulnerable --include-transitive` |
 | `Gemfile.lock` | bundler | `bundle audit` |
 | `composer.lock` | composer | `composer audit` |
 
@@ -50,11 +51,20 @@ Detect from configuration files:
 - `manage.py` → Django
 - Look for `flask` / `fastapi` in requirements → Flask/FastAPI
 
+### .NET / C#
+- `*.csproj` / `*.sln` → .NET project
+- `global.json` → .NET SDK version pinning
+- Check target framework: `grep -r "<TargetFramework>" *.csproj`
+- `net6.0`, `net7.0`, `net8.0`, `net9.0` → .NET 6+ (modern)
+- `netcoreapp3.1` → .NET Core 3.1 (EOL December 2022)
+- `net48`, `net472` → .NET Framework (legacy, Windows-only)
+- `Program.cs` with `WebApplication.CreateBuilder()` → ASP.NET Core (minimal hosting)
+- Look for `Microsoft.AspNetCore` packages → ASP.NET Core
+- `*Controller.cs` in `Controllers/` → MVC/API controllers
+
 ### Other Languages
 - `Cargo.toml` → Rust
 - `go.mod` → Go
-- `*.csproj` / `*.sln` → .NET (C#/F#)
-- `global.json` → .NET SDK version
 - `build.gradle` / `pom.xml` → Java (Gradle/Maven)
 - `Gemfile` → Ruby (Rails if `rails` in Gemfile)
 
@@ -108,6 +118,9 @@ Look for:
 - `typeorm.config.js` → TypeORM
 - `knexfile.js` → Knex.js
 - `sequelize.config.js` → Sequelize
+- `*DbContext.cs` → Entity Framework Core
+- `Migrations/` directory → EF Core migrations
+- Check EF version: `grep -r "Microsoft.EntityFrameworkCore" *.csproj`
 - Check environment variables for `DATABASE_URL`, `POSTGRES_`, `MONGODB_`, etc.
 
 ## How to Build Tech Stack Summary
