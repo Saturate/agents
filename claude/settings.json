@@ -1,8 +1,50 @@
 {
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "permissions": {
+    "allow": [
+      "Bash(git pull:*)",
+      "Bash(git fetch:*)",
+      "Bash(git status:*)",
+      "Bash(git log:*)",
+      "Bash(git diff:*)",
+      "Bash(git add:*)",
+      "Bash(git branch:*)",
+      "Bash(git checkout:*)",
+      "Bash(git switch:*)",
+      "Bash(git stash:*)",
+      "Bash(git show:*)",
+      "Bash(git blame:*)",
+      "Bash(git remote:*)",
+      "Bash(git tag:*)",
+      "Bash(which:*)",
+      "WebSearch",
+      "Bash(pnpm install:*)",
+      "Bash(pnpm run:*)",
+      "Bash(pnpm list:*)",
+      "Bash(pnpm why:*)",
+      "Bash(pnpm outdated:*)",
+      "mcp__chrome-devtools__*"
+    ],
+    "ask": [
+      "Bash(git push:*)"
+    ],
+    "deny": [
+      "Bash(rm -rf:*)",
+      "Bash(git reset --hard:*)",
+      "Bash(git clean -f:*)",
+      "Bash(git push --force:*)",
+      "Bash(git branch -D:*)",
+      "Read(.env)",
+      "Read(.env.*)",
+      "Edit(.env)",
+      "Edit(.env.*)"
+    ]
+  },
   "attribution": {
     "commit": "",
     "pr": ""
   },
+  "model": "opus",
   "statusLine": {
     "type": "command",
     "command": "$HOME/.claude/statusline-command.sh"
