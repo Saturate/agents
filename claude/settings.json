@@ -28,6 +28,8 @@
       "Bash(pnpm licenses:*)",
       "Bash(pnpm ls:*)",
       "Bash(pnpm info:*)",
+      "Bash(pnpm test:*)",
+      "WebFetch(domain:akj.io)",
       "mcp__chrome-devtools__*",
       "mcp__chrome-devtools-2__*",
       "mcp__chrome-devtools-3__*",
