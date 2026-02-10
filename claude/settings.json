@@ -23,7 +23,9 @@
       "Bash(pnpm list:*)",
       "Bash(pnpm why:*)",
       "Bash(pnpm outdated:*)",
-      "mcp__chrome-devtools__*"
+      "mcp__chrome-devtools__*",
+      "mcp__chrome-devtools-2__*",
+      "mcp__chrome-devtools-3__*"
     ],
     "ask": [
       "Bash(git push:*)"
