@@ -25,7 +25,8 @@
       "Bash(pnpm outdated:*)",
       "mcp__chrome-devtools__*",
       "mcp__chrome-devtools-2__*",
-      "mcp__chrome-devtools-3__*"
+      "mcp__chrome-devtools-3__*",
+      "Bash(find:*)"
     ],
     "ask": [
       "Bash(git push:*)"
