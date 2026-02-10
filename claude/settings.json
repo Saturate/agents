@@ -23,10 +23,18 @@
       "Bash(pnpm list:*)",
       "Bash(pnpm why:*)",
       "Bash(pnpm outdated:*)",
+      "Bash(pnpm view:*)",
+      "Bash(pnpm audit:*)",
+      "Bash(pnpm licenses:*)",
+      "Bash(pnpm ls:*)",
+      "Bash(pnpm info:*)",
       "mcp__chrome-devtools__*",
       "mcp__chrome-devtools-2__*",
       "mcp__chrome-devtools-3__*",
-      "Bash(find:*)"
+      "mcp__chrome-devtools-visible__*",
+      "Bash(find:*)",
+      "Bash(pnpm --version:*)",
+      "Bash(node --version:*)"
     ],
     "ask": [
       "Bash(git push:*)"

@@ -1,16 +1,16 @@
 ---
 name: using-chrome-devtools
 description: Automates headless Chrome via MCP for web scraping, screenshots, testing, and browser interactions. Handles multi-instance server selection to avoid lock conflicts between parallel agents. Triggers when browsing a website, taking a screenshot, scraping a page, testing a web app, automating browser interactions, or when chrome-devtools MCP tools are needed.
-compatibility: Requires chrome-devtools MCP servers registered at user scope (chrome-devtools, chrome-devtools-2, chrome-devtools-3)
+compatibility: Requires chrome-devtools MCP servers registered at user scope (chrome-devtools, chrome-devtools-2, chrome-devtools-3, chrome-devtools-visible)
 allowed-tools: Bash, ToolSearch
 metadata:
   author: Saturate
   version: "1.0"
 ---
 
-You are helping the user interact with websites using headless Chrome via the chrome-devtools MCP servers.
+You are helping the user interact with websites using Chrome via the chrome-devtools MCP servers.
 
-There are 3 isolated server instances available. You must pick a free one before doing any browser work.
+There are 4 isolated server instances available. You must pick a free one before doing any browser work.
 
 ## Progress Checklist
 
@@ -26,13 +26,16 @@ Chrome DevTools Progress:
 
 ## Step 1: Select an Available Server
 
-There are 3 MCP server instances with identical capabilities:
+There are 4 MCP server instances — 3 headless and 1 visible (opens a real browser window):
 
-| Instance | Tool prefix |
-|----------|-------------|
-| 1 | `mcp__chrome-devtools__*` |
-| 2 | `mcp__chrome-devtools-2__*` |
-| 3 | `mcp__chrome-devtools-3__*` |
+| Instance | Tool prefix | Mode |
+|----------|-------------|------|
+| 1 | `mcp__chrome-devtools__*` | Headless |
+| 2 | `mcp__chrome-devtools-2__*` | Headless |
+| 3 | `mcp__chrome-devtools-3__*` | Headless |
+| visible | `mcp__chrome-devtools-visible__*` | Visible |
+
+**When to use visible:** Use `chrome-devtools-visible` when the user asks to see the browser, needs to debug visually, or wants to watch automation in real-time. Default to headless instances for everything else.
 
 **To find a free instance**, check each server's `list_pages` tool (e.g. `mcp__chrome-devtools__list_pages`). Load them via ToolSearch:
 
@@ -42,10 +45,10 @@ ToolSearch: "+chrome-devtools list_pages"
 
 Then call `list_pages` on each instance. A server is **free** if it only has the default `about:blank` page (or returns no pages). A server is **busy** if it has pages with real URLs.
 
-**Check servers in order** (1 → 2 → 3) and use the first free one.
+**Check headless servers in order** (1 → 2 → 3) and use the first free one. Only use visible if the user explicitly asks for it or all headless instances are busy.
 
-If all 3 are busy, tell the user:
-> "All 3 chrome-devtools instances are currently in use. Wait for another task to finish or add more instances."
+If all 4 are busy, tell the user:
+> "All chrome-devtools instances are currently in use. Wait for another task to finish or add more instances."
 
 **CRITICAL:** Never run parallel Task agents on the same server instance. Each agent must claim its own instance.
 
@@ -149,3 +152,4 @@ Use `take_snapshot` to see the accessibility tree structure, then target element
 - For SPAs, wait for content to render after navigation before taking snapshots
 - If a page requires authentication, let the user know — headless browsers start with no session/cookies
 - Each server instance has its own isolated browser profile, so cookies and state are not shared between instances
+- The `chrome-devtools-visible` instance opens a real browser window — useful for demos or debugging but slower to start
