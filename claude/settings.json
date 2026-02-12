@@ -35,8 +35,37 @@
       "mcp__chrome-devtools-3__*",
       "mcp__chrome-devtools-visible__*",
       "Bash(find:*)",
+      "Bash(grep:*)",
+      "Bash(lsof:*)",
+      "Bash(gh run view:*)",
+      "Bash(gh run list:*)",
+      "Bash(gh run watch:*)",
+      "Bash(gh pr view:*)",
+      "Bash(gh pr list:*)",
+      "Bash(gh pr diff:*)",
+      "Bash(gh pr checks:*)",
+      "Bash(gh pr status:*)",
+      "Bash(gh issue view:*)",
+      "Bash(gh issue list:*)",
+      "Bash(gh issue status:*)",
+      "Bash(gh repo view:*)",
+      "Bash(gh repo list:*)",
+      "Bash(gh release view:*)",
+      "Bash(gh release list:*)",
+      "Bash(gh auth status:*)",
       "Bash(pnpm --version:*)",
-      "Bash(node --version:*)"
+      "Bash(node --version:*)",
+      "Bash(npm install:*)",
+      "Bash(npm run:*)",
+      "Bash(npm list:*)",
+      "Bash(npm ls:*)",
+      "Bash(npm why:*)",
+      "Bash(npm outdated:*)",
+      "Bash(npm view:*)",
+      "Bash(npm info:*)",
+      "Bash(npm audit:*)",
+      "Bash(npm test:*)",
+      "Bash(npm --version:*)"
     ],
     "ask": [
       "Bash(git push:*)"
@@ -67,5 +96,31 @@
     "code-review@claude-plugins-official": true,
     "typescript-lsp@claude-plugins-official": true,
     "swift-lsp@claude-plugins-official": true
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$HOME/.claude/hooks/log-tool-usage.sh",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$HOME/.claude/hooks/log-tool-usage.sh",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
   }
 }
