@@ -3,6 +3,9 @@
 # Tool usage logger for Claude Code hooks.
 # Handles both PreToolUse and PostToolUse events.
 # Writes daily-rotated JSONL to ~/.claude/logs/tool-usage-YYYY-MM-DD.jsonl
+# Pushes each event to Loki (backgrounded, never blocks).
+#
+# Loki credentials: set LOKI_USER and LOKI_PASS in shell profile or local dotenv.
 #
 # Never blocks — always exits 0.
 
@@ -10,7 +13,10 @@ set -euo pipefail
 
 LOG_DIR="$HOME/.claude/logs"
 LOG_FILE="$LOG_DIR/tool-usage-$(date +%Y-%m-%d).jsonl"
-mkdir -p "$LOG_DIR"
+TIMING_DIR="/tmp/claude-hook-timings"
+mkdir -p "$LOG_DIR" "$TIMING_DIR"
+
+LOKI_URL="https://loki.akj.io/loki/api/v1/push"
 
 INPUT=$(cat)
 
@@ -19,6 +25,7 @@ TOOL_NAME=$(echo "$INPUT" | jq -r '.tool_name // empty')
 TOOL_USE_ID=$(echo "$INPUT" | jq -r '.tool_use_id // empty')
 SESSION_ID=$(echo "$INPUT" | jq -r '.session_id // empty')
 CWD=$(echo "$INPUT" | jq -r '.cwd // empty')
+TRANSCRIPT_PATH=$(echo "$INPUT" | jq -r '.transcript_path // empty')
 
 # Map hook event to short label
 case "$EVENT_NAME" in
@@ -26,6 +33,24 @@ case "$EVENT_NAME" in
   PostToolUse) EVENT="post" ;;
   *)           exit 0 ;; # ignore unknown events
 esac
+
+# Git context from cwd: repo name from remote, branch
+GIT_REMOTE=""
+GIT_BRANCH=""
+if [ -n "$CWD" ] && git -C "$CWD" rev-parse --git-dir >/dev/null 2>&1; then
+  GIT_REMOTE=$(git -C "$CWD" remote get-url origin 2>/dev/null | sed 's|.*/||; s|\.git$||') || true
+  GIT_BRANCH=$(git -C "$CWD" symbolic-ref --short HEAD 2>/dev/null || git -C "$CWD" rev-parse --short HEAD 2>/dev/null) || true
+fi
+
+# Project name: git remote > transcript path project slug > cwd basename
+PROJECT=""
+[ -n "$GIT_REMOTE" ] && PROJECT="$GIT_REMOTE"
+if [ -z "$PROJECT" ] && [ -n "$TRANSCRIPT_PATH" ]; then
+  # transcript_path looks like ~/.claude/projects/-Users-alkj-code-github-claude/session.jsonl
+  # extract the project slug and grab the last segment
+  PROJECT=$(echo "$TRANSCRIPT_PATH" | sed 's|.*/projects/||; s|/.*||; s|.*-||')
+fi
+[ -z "$PROJECT" ] && PROJECT="${CWD##*/}"
 
 # Build a condensed summary of the tool input so we can search logs
 # without storing full file contents or command output
@@ -69,6 +94,24 @@ summarize_input() {
 SUMMARY=$(summarize_input "$TOOL_NAME")
 TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 
+# Duration tracking via nanosecond timestamps
+if [ "$EVENT" = "pre" ]; then
+  # macOS: use perl for nanosecond-ish precision (date +%N not available)
+  perl -MTime::HiRes=time -e 'printf "%.0f\n", time * 1e9' > "$TIMING_DIR/$TOOL_USE_ID" 2>/dev/null || true
+fi
+
+DURATION_MS="null"
+if [ "$EVENT" = "post" ] && [ -f "$TIMING_DIR/$TOOL_USE_ID" ]; then
+  START_NS=$(cat "$TIMING_DIR/$TOOL_USE_ID" 2>/dev/null || echo "")
+  if [ -n "$START_NS" ]; then
+    END_NS=$(perl -MTime::HiRes=time -e 'printf "%.0f\n", time * 1e9' 2>/dev/null || echo "")
+    if [ -n "$END_NS" ]; then
+      DURATION_MS=$(( (END_NS - START_NS) / 1000000 ))
+    fi
+  fi
+  rm -f "$TIMING_DIR/$TOOL_USE_ID"
+fi
+
 # Base entry fields shared by pre and post
 ENTRY=$(jq -cn \
   --arg ts "$TIMESTAMP" \
@@ -77,8 +120,12 @@ ENTRY=$(jq -cn \
   --arg tuid "$TOOL_USE_ID" \
   --arg tool "$TOOL_NAME" \
   --arg cwd "$CWD" \
+  --arg transcript "$TRANSCRIPT_PATH" \
+  --arg project "$PROJECT" \
+  --arg git_remote "$GIT_REMOTE" \
+  --arg git_branch "$GIT_BRANCH" \
   --arg summary "$SUMMARY" \
-  '{timestamp: $ts, event: $ev, session_id: $sid, tool_use_id: $tuid, tool_name: $tool, cwd: $cwd, input_summary: $summary}')
+  '{timestamp: $ts, event: $ev, session_id: $sid, tool_use_id: $tuid, tool_name: $tool, cwd: $cwd, transcript_path: $transcript, project: $project, git_remote: $git_remote, git_branch: $git_branch, input_summary: $summary}')
 
 # Post-only fields
 if [ "$EVENT" = "post" ]; then
@@ -91,9 +138,31 @@ if [ "$EVENT" = "post" ]; then
   ENTRY=$(echo "$ENTRY" | jq -c \
     --argjson exit_code "$EXIT_CODE" \
     --argjson output_size "$OUTPUT_SIZE" \
-    '. + {exit_code: $exit_code, output_size: $output_size}')
+    --argjson duration_ms "$DURATION_MS" \
+    '. + {exit_code: $exit_code, output_size: $output_size, duration_ms: $duration_ms}')
 fi
 
 echo "$ENTRY" >> "$LOG_FILE"
+
+# Push to Loki (backgrounded — never blocks the hook)
+if [ -n "${LOKI_USER:-}" ] && [ -n "${LOKI_PASS:-}" ]; then
+  LOKI_TS="$(date +%s)000000000"
+
+  LOKI_PAYLOAD=$(jq -cn \
+    --arg source "claude-code" \
+    --arg event "$EVENT" \
+    --arg tool_name "$TOOL_NAME" \
+    --arg project "$PROJECT" \
+    --arg git_branch "$GIT_BRANCH" \
+    --arg ts "$LOKI_TS" \
+    --arg line "$ENTRY" \
+    '{streams: [{stream: {source: $source, event: $event, tool_name: $tool_name, project: $project, git_branch: $git_branch}, values: [[$ts, $line]]}]}')
+
+  curl -s -u "$LOKI_USER:$LOKI_PASS" \
+    "$LOKI_URL" \
+    -H "Content-Type: application/json" \
+    -d "$LOKI_PAYLOAD" \
+    >/dev/null 2>&1 &
+fi
 
 exit 0
