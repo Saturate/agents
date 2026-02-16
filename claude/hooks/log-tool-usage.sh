@@ -9,7 +9,7 @@
 #
 # Never blocks — always exits 0.
 
-set -euo pipefail
+set -uo pipefail
 
 LOG_DIR="$HOME/.claude/logs"
 LOG_FILE="$LOG_DIR/tool-usage-$(date +%Y-%m-%d).jsonl"
@@ -18,14 +18,16 @@ mkdir -p "$LOG_DIR" "$TIMING_DIR"
 
 LOKI_URL="https://loki.akj.io/loki/api/v1/push"
 
-INPUT=$(cat)
+INPUT_FILE=$(mktemp)
+trap 'rm -f "$INPUT_FILE"; exit 0' EXIT ERR
+cat > "$INPUT_FILE"
 
-EVENT_NAME=$(echo "$INPUT" | jq -r '.hook_event_name // empty')
-TOOL_NAME=$(echo "$INPUT" | jq -r '.tool_name // empty')
-TOOL_USE_ID=$(echo "$INPUT" | jq -r '.tool_use_id // empty')
-SESSION_ID=$(echo "$INPUT" | jq -r '.session_id // empty')
-CWD=$(echo "$INPUT" | jq -r '.cwd // empty')
-TRANSCRIPT_PATH=$(echo "$INPUT" | jq -r '.transcript_path // empty')
+EVENT_NAME=$(jq -r '.hook_event_name // empty' < "$INPUT_FILE")
+TOOL_NAME=$(jq -r '.tool_name // empty' < "$INPUT_FILE")
+TOOL_USE_ID=$(jq -r '.tool_use_id // empty' < "$INPUT_FILE")
+SESSION_ID=$(jq -r '.session_id // empty' < "$INPUT_FILE")
+CWD=$(jq -r '.cwd // empty' < "$INPUT_FILE")
+TRANSCRIPT_PATH=$(jq -r '.transcript_path // empty' < "$INPUT_FILE")
 
 # Map hook event to short label
 case "$EVENT_NAME" in
@@ -57,7 +59,7 @@ fi
 summarize_input() {
   local tool="$1"
   local input
-  input=$(echo "$INPUT" | jq -c '.tool_input // {}')
+  input=$(jq -c '.tool_input // {}' < "$INPUT_FILE")
 
   case "$tool" in
     Bash)
@@ -130,10 +132,10 @@ ENTRY=$(jq -cn \
 # Post-only fields
 if [ "$EVENT" = "post" ]; then
   # Bash exit code lives in tool_response
-  EXIT_CODE=$(echo "$INPUT" | jq '.tool_response.exit_code // null')
+  EXIT_CODE=$(jq '.tool_response.exit_code // null' < "$INPUT_FILE")
 
   # Byte length of the full response (avoids logging actual content)
-  OUTPUT_SIZE=$(echo "$INPUT" | jq -r '.tool_response // empty' | wc -c | tr -d ' ')
+  OUTPUT_SIZE=$(jq -r '.tool_response // empty' < "$INPUT_FILE" | wc -c | tr -d ' ')
 
   ENTRY=$(echo "$ENTRY" | jq -c \
     --argjson exit_code "$EXIT_CODE" \
