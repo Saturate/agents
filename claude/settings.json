@@ -1,5 +1,9 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "attribution": {
+    "commit": "",
+    "pr": ""
+  },
   "permissions": {
     "allow": [
       "Bash(git pull:*)",
@@ -65,10 +69,22 @@
       "Bash(npm info:*)",
       "Bash(npm audit:*)",
       "Bash(npm test:*)",
-      "Bash(npm --version:*)"
-    ],
-    "ask": [
-      "Bash(git push:*)"
+      "Bash(npm --version:*)",
+      "Bash(docker ps:*)",
+      "Bash(docker images:*)",
+      "Bash(docker logs:*)",
+      "Bash(docker inspect:*)",
+      "Bash(docker compose ps:*)",
+      "Bash(docker compose logs:*)",
+      "Bash(docker compose config:*)",
+      "Bash(docker stats:*)",
+      "Bash(docker top:*)",
+      "Bash(docker port:*)",
+      "Bash(docker network ls:*)",
+      "Bash(docker network inspect:*)",
+      "Bash(docker volume ls:*)",
+      "Bash(docker version:*)",
+      "Bash(docker info:*)"
     ],
     "deny": [
       "Bash(rm -rf:*)",
@@ -80,23 +96,12 @@
       "Read(.env.*)",
       "Edit(.env)",
       "Edit(.env.*)"
+    ],
+    "ask": [
+      "Bash(git push:*)"
     ]
   },
-  "attribution": {
-    "commit": "",
-    "pr": ""
-  },
   "model": "opus",
-  "statusLine": {
-    "type": "command",
-    "command": "$HOME/.claude/statusline-command.sh"
-  },
-  "enabledPlugins": {
-    "frontend-design@claude-plugins-official": true,
-    "code-review@claude-plugins-official": true,
-    "typescript-lsp@claude-plugins-official": true,
-    "swift-lsp@claude-plugins-official": true
-  },
   "hooks": {
     "PreToolUse": [
       {
@@ -122,5 +127,15 @@
         ]
       }
     ]
+  },
+  "statusLine": {
+    "type": "command",
+    "command": "$HOME/.claude/statusline-command.sh"
+  },
+  "enabledPlugins": {
+    "frontend-design@claude-plugins-official": true,
+    "code-review@claude-plugins-official": true,
+    "typescript-lsp@claude-plugins-official": true,
+    "swift-lsp@claude-plugins-official": true
   }
 }
