@@ -84,7 +84,8 @@
       "Bash(docker network inspect:*)",
       "Bash(docker volume ls:*)",
       "Bash(docker version:*)",
-      "Bash(docker info:*)"
+      "Bash(docker info:*)",
+      "Bash(dig:*)"
     ],
     "deny": [
       "Bash(rm -rf:*)",
