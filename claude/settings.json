@@ -106,9 +106,13 @@
       "Bash(git push --force:*)",
       "Bash(git branch -D:*)",
       "Read(.env)",
-      "Read(.env.*)",
+      "Read(.env.local)",
+      "Read(.env.production)",
+      "Read(.env.development)",
       "Edit(.env)",
-      "Edit(.env.*)"
+      "Edit(.env.local)",
+      "Edit(.env.production)",
+      "Edit(.env.development)"
     ],
     "ask": [
       "Bash(git push:*)"
