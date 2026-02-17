@@ -1,3 +1,7 @@
+# PR Reviews
+
+- Never post PR comments, reviews, or any external-facing content without explicit user approval. Always show drafts first and wait for a go-ahead.
+
 # General Code
 
 - Do not add "backward compatibility" without asking if it's needed.
@@ -40,11 +44,11 @@ Write commit messages like a humble but experienced engineer would. Keep it casu
 
 No robot speak, marketing buzzwords, or listicles. Assume the reader can follow the code perfectly fine.
 
-# Exports and Clipboard
+# Clipboard
 
-When I ask for content to "export", "handoff", "save for later", or similar - automatically copy it to clipboard using the appropriate tool:
+Only copy to clipboard when I explicitly say "copy to clipboard", "to clipboard", "clip it", or "pbcopy". Do not copy on generic words like "export", "save", or "handoff" — those usually refer to code operations, not clipboard.
+
+Commands by platform:
 - macOS: `pbcopy`
-- Linux: `xclip -selection clipboard` (if available)
+- Linux: `xclip -selection clipboard`
 - Windows/WSL: `clip.exe`
-
-Useful for: prompt handoffs, summaries, formatted outputs, git info, file paths, etc.
