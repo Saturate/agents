@@ -85,7 +85,19 @@
       "Bash(docker volume ls:*)",
       "Bash(docker version:*)",
       "Bash(docker info:*)",
-      "Bash(dig:*)"
+      "Bash(dig:*)",
+      "Bash(go build:*)",
+      "Bash(go run:*)",
+      "Bash(go test:*)",
+      "Bash(go mod tidy:*)",
+      "Bash(go mod download:*)",
+      "Bash(go mod verify:*)",
+      "Bash(go vet:*)",
+      "Bash(go fmt:*)",
+      "Bash(go list:*)",
+      "Bash(go version:*)",
+      "Bash(go env:*)",
+      "Bash(go doc:*)"
     ],
     "deny": [
       "Bash(rm -rf:*)",
