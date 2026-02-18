@@ -1,36 +1,30 @@
-# Claude Configuration & Skills
+# Claude Configuration
 
-Custom Claude Code skills for code reviews and codebase audits, plus personal configuration files.
+Personal Claude Code configuration — coding guidelines, settings, hooks, and statusline.
 
-## Skills
+Skills live in a dedicated repo: **[Saturate/skills](https://github.com/Saturate/skills)** (included here as a git submodule).
 
-| Skill | Description | Requirements |
-|-------|-------------|--------------|
-| `/pr-review` | Performs comprehensive code reviews checking for bugs, security issues, performance problems, testing gaps, and code quality. | Basic tools (Read, Grep, Glob, Bash) |
-| `/codebase-audit` | Comprehensive codebase audits covering architecture, tech debt, security, accessibility, and framework best practices. Includes automated scans. | Basic tools (Read, Grep, Glob, Bash) |
-| `/hunting-bugs` | Hunts for common bug patterns including timezone issues, null safety, type coercion, async handling, and performance problems. Provides actionable fixes. | Basic tools (Read, Grep, Glob, Bash) |
-| `/azure-init` | Clones all repositories from an Azure DevOps project and organizes them locally based on namespacing patterns. | Azure DevOps MCP, Git |
-| `/make-pr` | Creates pull requests on GitHub or Azure DevOps with auto-generated titles and descriptions. Detects platform and generates context-aware PR content. | Git, `gh` CLI (GitHub) or `az` CLI (Azure) |
-| `/validate-skill` | Validates Claude Code skills against official Anthropic best practices by fetching the latest documentation. Generates detailed reports. | Read, Grep, Glob, WebFetch |
+## What's here
 
-## Quick Install
+| File | Purpose |
+|------|---------|
+| `CLAUDE.md` | Coding guidelines, commit style, TypeScript rules, PR review policy |
+| `settings.json` | Permission rules and tool settings |
+| `statusline-command.sh` | Custom statusline script |
+| `hooks/` | Tool-usage logging hooks |
+| `skills/` | Git submodule pointing to [Saturate/skills](https://github.com/Saturate/skills) |
 
-### Install Skills Only
+## Install
 
-```bash
-npx skills add Saturate/claude
-```
-
-### Install Everything (Skills + Config)
-
-For personal use, clone and run the install script to symlink everything to `~/.claude/`:
+Clone and run the install script to symlink everything to `~/.claude/`:
 
 ```bash
-git clone https://github.com/Saturate/claude.git
+git clone --recurse-submodules https://github.com/Saturate/claude.git
 cd claude
 ./install.sh              # Interactive mode (prompts for existing files)
 ./install.sh --force      # Backup existing files and create symlinks
 ./install.sh --skip-existing   # Skip existing files
+./install.sh --hooks      # Also symlink hooks/ for tool-usage logging
 ```
 
-This installs skills (`/pr-review`, `/codebase-audit`, `/hunting-bugs`, `/azure-init`, `/make-pr`, and `/validate-skill`), coding guidelines (`CLAUDE.md`), settings (`settings.json`), and custom statusline script.
+The install script initializes the skills submodule and auto-detects all skills (any directory under `skills/` with a `SKILL.md`).

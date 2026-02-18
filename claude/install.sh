@@ -22,10 +22,20 @@ EOF
 # Determine the script's directory (works even if called from elsewhere)
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
+# Initialize submodules (skills live in a separate repo)
+git -C "$SCRIPT_DIR" submodule update --init
+
 # Define source files and target directory
 SOURCE_FILES=("CLAUDE.md" "settings.json" "statusline-command.sh")
-SKILL_DIRS=("pr-review" "codebase-audit" "azure-init" "hunting-bugs" "make-pr" "validate-skill" "chrome-devtools")
 TARGET_DIR="$HOME/.claude"
+
+# Auto-detect skills: any directory under skills/ containing a SKILL.md
+SKILL_DIRS=()
+for skill_dir in "$SCRIPT_DIR"/skills/*/; do
+    if [ -f "$skill_dir/SKILL.md" ]; then
+        SKILL_DIRS+=("$(basename "$skill_dir")")
+    fi
+done
 
 # Parse command line flags
 FORCE_BACKUP=false
