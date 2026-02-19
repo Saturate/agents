@@ -6,7 +6,7 @@ input=$(cat)
 # Extract values
 current_dir=$(echo "$input" | jq -r '.workspace.current_dir')
 project_dir=$(echo "$input" | jq -r '.workspace.project_dir')
-model_name=$(echo "$input" | jq -r '.model.display_name')
+model_name=$(echo "$input" | jq -r '.model.id')
 context_window=$(echo "$input" | jq -r '.context_window')
 
 # Keep original dirs for git commands
@@ -66,36 +66,8 @@ if git -C "$dir_full" rev-parse --git-dir > /dev/null 2>&1; then
     git_info=" [$branch $status]"
 fi
 
-# Simplify model name (e.g., "Claude 3.5 Sonnet" -> "Sonnet 3.5")
-if [[ "$model_name" == *"Sonnet"* ]]; then
-    if [[ "$model_name" == *"4.5"* ]]; then
-        model_short="Sonnet 4.5"
-    elif [[ "$model_name" == *"3.7"* ]]; then
-        model_short="Sonnet 3.7"
-    elif [[ "$model_name" == *"3.5"* ]]; then
-        model_short="Sonnet 3.5"
-    else
-        model_short="Sonnet"
-    fi
-elif [[ "$model_name" == *"Opus"* ]]; then
-    if [[ "$model_name" == *"4.5"* ]]; then
-        model_short="Opus 4.5"
-    elif [[ "$model_name" == *"4"* ]]; then
-        model_short="Opus 4"
-    else
-        model_short="Opus"
-    fi
-elif [[ "$model_name" == *"Haiku"* ]]; then
-    if [[ "$model_name" == *"3.7"* ]]; then
-        model_short="Haiku 3.7"
-    elif [[ "$model_name" == *"3.5"* ]]; then
-        model_short="Haiku 3.5"
-    else
-        model_short="Haiku"
-    fi
-else
-    model_short="$model_name"
-fi
+# Use full model ID directly (e.g., "claude-sonnet-4-6")
+model_short="$model_name"
 
 # Calculate context usage percentage and cost
 usage=$(echo "$context_window" | jq '.current_usage')
@@ -121,26 +93,18 @@ if [ "$usage" != "null" ]; then
         pct=0
     fi
 
-    # Calculate cost based on model (using cumulative totals)
-    # Pricing per million tokens (as of January 2025)
-    if [[ "$model_short" == "Sonnet 4.5" ]]; then
-        # Claude 3.5 Sonnet: $3 input, $15 output per MTok
-        input_cost=$(awk "BEGIN {printf \"%.4f\", $total_input * 3 / 1000000}")
-        output_cost=$(awk "BEGIN {printf \"%.4f\", $total_output * 15 / 1000000}")
-    elif [[ "$model_short" == "Opus 4.5" ]]; then
-        # Claude Opus 4.5: $15 input, $75 output per MTok
+    # Calculate cost based on model ID (using cumulative totals)
+    # Pricing per million tokens (as of February 2026)
+    if [[ "$model_short" == *"opus"* ]]; then
+        # Claude Opus: $15 input, $75 output per MTok
         input_cost=$(awk "BEGIN {printf \"%.4f\", $total_input * 15 / 1000000}")
         output_cost=$(awk "BEGIN {printf \"%.4f\", $total_output * 75 / 1000000}")
-    elif [[ "$model_short" == "Haiku 3.5" ]]; then
-        # Claude 3.5 Haiku: $0.80 input, $4 output per MTok
+    elif [[ "$model_short" == *"haiku"* ]]; then
+        # Claude Haiku: $0.80 input, $4 output per MTok
         input_cost=$(awk "BEGIN {printf \"%.4f\", $total_input * 0.80 / 1000000}")
         output_cost=$(awk "BEGIN {printf \"%.4f\", $total_output * 4 / 1000000}")
-    elif [[ "$model_short" == "Sonnet 3.7" ]]; then
-        # Claude 3.7 Sonnet: $3 input, $15 output per MTok
-        input_cost=$(awk "BEGIN {printf \"%.4f\", $total_input * 3 / 1000000}")
-        output_cost=$(awk "BEGIN {printf \"%.4f\", $total_output * 15 / 1000000}")
     else
-        # Default to Sonnet 3.5 pricing
+        # Claude Sonnet and others: $3 input, $15 output per MTok
         input_cost=$(awk "BEGIN {printf \"%.4f\", $total_input * 3 / 1000000}")
         output_cost=$(awk "BEGIN {printf \"%.4f\", $total_output * 15 / 1000000}")
     fi
