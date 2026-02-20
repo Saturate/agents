@@ -14,7 +14,9 @@ Quick reference for frequently found issues in code reviews.
 6. [Code Quality](#code-quality)
 7. [TypeScript Issues](#typescript-issues)
 8. [Testing](#testing)
-9. [Quick Reference](#quick-reference)
+9. [Accessibility](#accessibility)
+10. [Database Migrations](#database-migrations)
+11. [Quick Reference](#quick-reference)
 
 ---
 
@@ -455,6 +457,132 @@ test('divides numbers', () => {
   expect(divide(0, 10)).toBe(0);
 });
 ```
+
+## Accessibility
+
+### Missing Alt Text
+```html
+<!-- ❌ Bad -->
+<img src="chart.png" />
+
+<!-- ✓ Good - descriptive -->
+<img src="chart.png" alt="Monthly revenue growth from $10k to $45k over 6 months" />
+
+<!-- ✓ Good - decorative, hidden from screen readers -->
+<img src="divider.png" alt="" />
+```
+
+### Keyboard Inaccessible Interactive Elements
+```html
+<!-- ❌ Bad - div click handler is not keyboard accessible -->
+<div onClick={handleDelete}>Delete</div>
+
+<!-- ✓ Good -->
+<button onClick={handleDelete}>Delete</button>
+
+<!-- ✓ Good - if you must use a non-semantic element -->
+<div role="button" tabIndex={0} onClick={handleDelete} onKeyDown={e => e.key === 'Enter' && handleDelete()}>
+  Delete
+</div>
+```
+
+### Missing Form Labels
+```html
+<!-- ❌ Bad -->
+<input type="email" placeholder="Email address" />
+
+<!-- ✓ Good - explicit label -->
+<label htmlFor="email">Email address</label>
+<input id="email" type="email" />
+
+<!-- ✓ Good - aria-label when visible label isn't possible -->
+<input type="search" aria-label="Search products" />
+```
+
+### Focus Not Managed After Dynamic Changes
+```typescript
+// ❌ Bad - modal opens but focus stays behind it
+function openModal() {
+  setModalOpen(true)
+}
+
+// ✓ Good - move focus into modal when it opens
+function openModal() {
+  setModalOpen(true)
+  requestAnimationFrame(() => {
+    modalRef.current?.focus()
+  })
+}
+```
+
+### Color as the Only Visual Indicator
+```html
+<!-- ❌ Bad - error only shown through red color -->
+<input style="border-color: red" />
+
+<!-- ✓ Good - error communicated through color + text + icon -->
+<input aria-invalid="true" aria-describedby="email-error" style="border-color: red" />
+<span id="email-error" role="alert">⚠ Please enter a valid email</span>
+```
+
+---
+
+## Database Migrations
+
+### Destructive Column Rename (Breaks Running Instances)
+```sql
+-- ❌ Bad - rename in one step while old code still reads 'username'
+ALTER TABLE users RENAME COLUMN username TO display_name;
+
+-- ✓ Good - expand/contract pattern
+-- Step 1 (this PR): add new column, backfill, write to both
+ALTER TABLE users ADD COLUMN display_name VARCHAR(255);
+UPDATE users SET display_name = username;
+
+-- Step 2 (later PR, after old code is gone): drop old column
+ALTER TABLE users DROP COLUMN username;
+```
+
+### Non-Nullable Column Without Default (Breaks Inserts from Old Code)
+```sql
+-- ❌ Bad - existing code doesn't know about this column, inserts will fail
+ALTER TABLE orders ADD COLUMN currency VARCHAR(3) NOT NULL;
+
+-- ✓ Good - nullable or with a safe default
+ALTER TABLE orders ADD COLUMN currency VARCHAR(3) NOT NULL DEFAULT 'USD';
+-- or
+ALTER TABLE orders ADD COLUMN currency VARCHAR(3);
+```
+
+### Missing Down Migration
+```javascript
+// ❌ Bad - no way to roll back
+exports.up = async (knex) => {
+  await knex.schema.createTable('sessions', ...)
+}
+
+// ✓ Good
+exports.up = async (knex) => {
+  await knex.schema.createTable('sessions', ...)
+}
+exports.down = async (knex) => {
+  await knex.schema.dropTable('sessions')
+}
+```
+
+### Locking Migration on Large Table
+```sql
+-- ❌ Bad - adding NOT NULL without default locks the table for a full rewrite
+ALTER TABLE events ADD COLUMN processed BOOLEAN NOT NULL DEFAULT false;
+
+-- ✓ Good - separate steps to avoid long lock
+ALTER TABLE events ADD COLUMN processed BOOLEAN;           -- fast, no lock
+UPDATE events SET processed = false WHERE processed IS NULL; -- batched separately
+ALTER TABLE events ALTER COLUMN processed SET NOT NULL;     -- short lock once data is clean
+ALTER TABLE events ALTER COLUMN processed SET DEFAULT false;
+```
+
+---
 
 ## Quick Reference
 
