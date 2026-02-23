@@ -159,13 +159,14 @@ parse_transcript_totals() {
     | .message.usage // empty
     | {input_tokens, output_tokens, cache_read_input_tokens, cache_creation_input_tokens}
   ' < "$path" 2>/dev/null | jq -sc '
-    reduce .[] as $u ({input_tokens:0, output_tokens:0, cache_read_input_tokens:0, cache_creation_input_tokens:0};
+    . as $arr
+    | reduce $arr[] as $u ({input_tokens:0, output_tokens:0, cache_read_input_tokens:0, cache_creation_input_tokens:0};
       .input_tokens += ($u.input_tokens // 0)
       | .output_tokens += ($u.output_tokens // 0)
       | .cache_read_input_tokens += ($u.cache_read_input_tokens // 0)
       | .cache_creation_input_tokens += ($u.cache_creation_input_tokens // 0)
     )
-    | . + {turn_count: (input | length)}
+    | . + {turn_count: ($arr | length)}
   ' 2>/dev/null || echo '{}'
 }
 
