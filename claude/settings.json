@@ -222,32 +222,6 @@
       "Bash(git push:*)"
     ]
   },
-  "hooks": {
-    "PreToolUse": [
-      {
-        "matcher": "",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "$HOME/.claude/hooks/log-tool-usage.sh",
-            "timeout": 10
-          }
-        ]
-      }
-    ],
-    "PostToolUse": [
-      {
-        "matcher": "",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "$HOME/.claude/hooks/log-tool-usage.sh",
-            "timeout": 10
-          }
-        ]
-      }
-    ]
-  },
   "statusLine": {
     "type": "command",
     "command": "$HOME/.claude/statusline-command.sh"
@@ -256,6 +230,8 @@
     "frontend-design@claude-plugins-official": true,
     "code-review@claude-plugins-official": true,
     "typescript-lsp@claude-plugins-official": true,
-    "swift-lsp@claude-plugins-official": true
-  }
+    "swift-lsp@claude-plugins-official": true,
+    "observability@Saturate-claude": true
+  },
+  "skipDangerousModePermissionPrompt": true
 }

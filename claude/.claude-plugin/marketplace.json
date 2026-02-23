@@ -1,0 +1,14 @@
+{
+  "name": "Saturate-claude",
+  "owner": {
+    "name": "Saturate"
+  },
+  "plugins": [
+    {
+      "name": "observability",
+      "source": "./plugins/observability",
+      "description": "Comprehensive hook logging — tracks tool usage, sessions, turns, prompts, subagents, compactions, notifications, and permissions with JSONL files and optional Loki push.",
+      "version": "1.0.0"
+    }
+  ]
+}

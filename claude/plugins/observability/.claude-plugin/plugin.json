@@ -1,0 +1,11 @@
+{
+  "name": "observability",
+  "description": "Comprehensive Claude Code observability — tracks sessions, costs, tool usage, prompts, subagents, and more via daily-rotated JSONL with optional Loki push",
+  "version": "1.0.0",
+  "author": {
+    "name": "Saturate"
+  },
+  "repository": "https://github.com/Saturate/claude",
+  "license": "MIT",
+  "hooks": "./hooks/hooks.json"
+}

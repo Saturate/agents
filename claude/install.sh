@@ -10,10 +10,14 @@ Create symlinks for Claude configuration files to ~/.claude/
 OPTIONS:
     -f, --force           Automatically backup existing files and create symlinks
     -s, --skip-existing   Skip existing files without prompting
-    --hooks               Symlink hooks/ directory to enable tool-usage logging
     -h, --help           Show this help message
 
 Without options, the script will prompt interactively for existing files.
+
+PLUGIN (observability):
+    Hook logging is now a Claude Code plugin. After running this script:
+      /plugin marketplace add Saturate/claude
+      /plugin install observability@Saturate-claude
 
 EOF
     exit 0
@@ -40,8 +44,6 @@ done
 # Parse command line flags
 FORCE_BACKUP=false
 SKIP_EXISTING=false
-INSTALL_HOOKS=false
-
 while [[ $# -gt 0 ]]; do
     case $1 in
         -f|--force)
@@ -50,10 +52,6 @@ while [[ $# -gt 0 ]]; do
             ;;
         -s|--skip-existing)
             SKIP_EXISTING=true
-            shift
-            ;;
-        --hooks)
-            INSTALL_HOOKS=true
             shift
             ;;
         -h|--help)
@@ -266,36 +264,6 @@ for skill in "${SKILL_DIRS[@]}"; do
         skipped_files+=("skills/$skill (error)")
     fi
 done
-
-# Install hooks if requested
-# Hook config lives in settings.json already — this just symlinks the scripts
-if [ "$INSTALL_HOOKS" = true ]; then
-    echo ""
-    echo "Setting up tool-usage logging hooks..."
-
-    HOOKS_SOURCE="$SCRIPT_DIR/hooks"
-    HOOKS_TARGET="$TARGET_DIR/hooks"
-
-    if [ -L "$HOOKS_TARGET" ]; then
-        current_target=$(readlink "$HOOKS_TARGET")
-        if [ "$current_target" = "$HOOKS_SOURCE" ]; then
-            echo "✓ hooks/ is already correctly symlinked"
-        else
-            rm "$HOOKS_TARGET"
-            ln -s "$HOOKS_SOURCE" "$HOOKS_TARGET"
-            echo "✓ Updated hooks/ symlink"
-            linked_files+=("hooks/")
-        fi
-    elif [ -e "$HOOKS_TARGET" ]; then
-        echo "⚠️  $HOOKS_TARGET already exists and is not a symlink — skipping"
-        echo "  Remove it manually if you want the symlink instead"
-        skipped_files+=("hooks/ (exists, not a symlink)")
-    else
-        ln -s "$HOOKS_SOURCE" "$HOOKS_TARGET"
-        echo "✓ Created symlink: hooks/"
-        linked_files+=("hooks/")
-    fi
-fi
 
 # Display summary
 echo ""
