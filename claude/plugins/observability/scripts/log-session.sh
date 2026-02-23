@@ -40,7 +40,8 @@ case "$HOOK_EVENT" in
       --arg source "claude-code" \
       --arg event "session" \
       --arg project "$PROJECT" \
-      '{source: $source, event: $event, project: $project}')" "$ENTRY"
+      --arg model "$MODEL" \
+      '{source: $source, event: $event, project: $project, model: $model}')" "$ENTRY"
     ;;
 
   SessionEnd)
@@ -121,7 +122,8 @@ case "$HOOK_EVENT" in
       --arg source "claude-code" \
       --arg event "session" \
       --arg project "$PROJECT" \
-      '{source: $source, event: $event, project: $project}')" "$ENTRY"
+      --arg model "$MODEL" \
+      '{source: $source, event: $event, project: $project, model: $model}')" "$ENTRY"
 
     # Clean up turn counter files
     rm -f "$TIMING_DIR/turn-count-$SESSION_ID" "$TIMING_DIR/turn-tools-$SESSION_ID" "$TIMING_DIR/turn-failures-$SESSION_ID"

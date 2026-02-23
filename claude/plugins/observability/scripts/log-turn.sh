@@ -70,6 +70,7 @@ push_loki "$(jq -cn \
   --arg source "claude-code" \
   --arg event "turn" \
   --arg project "$PROJECT" \
-  '{source: $source, event: $event, project: $project}')" "$ENTRY"
+  --arg model "$MODEL" \
+  '{source: $source, event: $event, project: $project, model: $model}')" "$ENTRY"
 
 exit 0
