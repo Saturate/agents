@@ -112,9 +112,9 @@ push_loki() {
 model_pricing() {
   local model="$1"
   case "$model" in
-    *opus*)   echo "15.00 75.00" ;;
+    *opus*)   echo "5.00 25.00" ;;
     *sonnet*) echo "3.00 15.00" ;;
-    *haiku*)  echo "0.80 4.00" ;;
+    *haiku*)  echo "1.00 5.00" ;;
     *)        echo "3.00 15.00" ;; # default to sonnet
   esac
 }
