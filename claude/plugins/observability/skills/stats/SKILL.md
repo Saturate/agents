@@ -43,29 +43,32 @@ Or for cross-month ranges, generate the dates with a loop.
 
 ### Cost summary
 
-Query `sessions-*.jsonl` for `session_end` events:
+Query `turns-*.jsonl` for real-time cost data (available during active sessions, not just after session_end):
 ```bash
-cat ~/.claude/logs/sessions-$(date +%Y-%m-%d).jsonl 2>/dev/null \
-  | jq -s '[.[] | select(.event == "session_end")] | {
-    sessions: length,
+cat ~/.claude/logs/turns-$(date +%Y-%m-%d).jsonl 2>/dev/null \
+  | jq -s '{
+    turns: length,
     total_cost_usd: (map(.estimated_cost_usd // 0) | add),
     total_input_tokens: (map(.usage.input_tokens // 0) | add),
     total_output_tokens: (map(.usage.output_tokens // 0) | add),
     total_cache_read: (map(.usage.cache_read_input_tokens // 0) | add),
-    avg_cache_hit_rate: (map(.cache_hit_rate // 0) | if length > 0 then add / length else 0 end),
-    total_turns: (map(.turn_count // 0) | add),
-    avg_duration_min: (map(.duration_s // 0) | if length > 0 then (add / length / 60) else 0 end)
+    total_cache_create: (map(.usage.cache_creation_input_tokens // 0) | add),
+    total_tools: (map(.tool_count // 0) | add),
+    total_failures: (map(.tool_failures // 0) | add),
+    sessions: (map(.session_id) | unique | length)
   }'
 ```
 
 ### Cost by project
 
+Uses turns data so active sessions are included:
 ```bash
-cat ~/.claude/logs/sessions-$(date +%Y-%m-%d).jsonl 2>/dev/null \
+cat ~/.claude/logs/turns-$(date +%Y-%m-%d).jsonl 2>/dev/null \
   | jq -s 'group_by(.project) | map({
     project: .[0].project,
-    sessions: length,
-    cost_usd: (map(select(.event == "session_end") | .estimated_cost_usd // 0) | add)
+    sessions: (map(.session_id) | unique | length),
+    turns: length,
+    cost_usd: (map(.estimated_cost_usd // 0) | add)
   }) | sort_by(-.cost_usd)'
 ```
 
