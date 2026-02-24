@@ -214,19 +214,9 @@
       "Bash(git reset --hard:*)",
       "Bash(git clean -f:*)",
       "Bash(git push --force:*)",
-      "Bash(git branch -D:*)",
-      "Read(.env)",
-      "Read(.env.local)",
-      "Read(.env.production)",
-      "Read(.env.development)",
-      "Edit(.env)",
-      "Edit(.env.local)",
-      "Edit(.env.production)",
-      "Edit(.env.development)"
+      "Bash(git branch -D:*)"
     ],
-    "ask": [
-      "Bash(git push:*)"
-    ]
+    "ask": ["Bash(git push:*)"]
   },
   "statusLine": {
     "type": "command",
