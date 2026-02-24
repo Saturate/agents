@@ -94,25 +94,36 @@ if [ "$usage" != "null" ]; then
     fi
 
     # Calculate cost based on model ID (using cumulative totals)
-    # Pricing per million tokens (as of February 2026)
+    # Pricing per million tokens (4.5/4.6 rates)
     if [[ "$model_short" == *"opus"* ]]; then
-        # Claude Opus: $15 input, $75 output per MTok
-        input_cost=$(awk "BEGIN {printf \"%.4f\", $total_input * 15 / 1000000}")
-        output_cost=$(awk "BEGIN {printf \"%.4f\", $total_output * 75 / 1000000}")
+        input_cost=$(awk "BEGIN {printf \"%.4f\", $total_input * 5 / 1000000}")
+        output_cost=$(awk "BEGIN {printf \"%.4f\", $total_output * 25 / 1000000}")
     elif [[ "$model_short" == *"haiku"* ]]; then
-        # Claude Haiku: $0.80 input, $4 output per MTok
-        input_cost=$(awk "BEGIN {printf \"%.4f\", $total_input * 0.80 / 1000000}")
-        output_cost=$(awk "BEGIN {printf \"%.4f\", $total_output * 4 / 1000000}")
+        input_cost=$(awk "BEGIN {printf \"%.4f\", $total_input * 1 / 1000000}")
+        output_cost=$(awk "BEGIN {printf \"%.4f\", $total_output * 5 / 1000000}")
     else
-        # Claude Sonnet and others: $3 input, $15 output per MTok
         input_cost=$(awk "BEGIN {printf \"%.4f\", $total_input * 3 / 1000000}")
         output_cost=$(awk "BEGIN {printf \"%.4f\", $total_output * 15 / 1000000}")
     fi
 
     total_cost=$(awk "BEGIN {printf \"%.2f\", $input_cost + $output_cost}")
 
-    printf "%s%s (%s - %d%% - \$%s)" "$dir_display" "$git_info" "$model_short" "$pct" "$total_cost"
+    # Format token counts (e.g. 1.2k, 3.4M)
+    fmt_tokens() {
+        local t=$1
+        if [ "$t" -ge 1000000 ]; then
+            awk "BEGIN {printf \"%.1fM\", $t / 1000000}"
+        elif [ "$t" -ge 1000 ]; then
+            awk "BEGIN {printf \"%.1fk\", $t / 1000}"
+        else
+            echo "$t"
+        fi
+    }
+    in_fmt=$(fmt_tokens "$total_input")
+    out_fmt=$(fmt_tokens "$total_output")
+
+    printf "%s%s (%s - %d%% - %s↑ %s↓ - \$%s)" "$dir_display" "$git_info" "$model_short" "$pct" "$in_fmt" "$out_fmt" "$total_cost"
 else
     # No usage data yet
-    printf "%s%s (%s - 0%% - \$0.00)" "$dir_display" "$git_info" "$model_short"
+    printf "%s%s (%s - 0%% - 0↑ 0↓ - \$0.00)" "$dir_display" "$git_info" "$model_short"
 fi
