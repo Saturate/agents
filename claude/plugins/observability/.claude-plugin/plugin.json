@@ -6,6 +6,5 @@
     "name": "Saturate"
   },
   "repository": "https://github.com/Saturate/claude",
-  "license": "MIT",
-  "hooks": "./hooks/hooks.json"
+  "license": "MIT"
 }
