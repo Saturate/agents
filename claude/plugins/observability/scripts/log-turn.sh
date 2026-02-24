@@ -21,10 +21,24 @@ TURN_NUMBER=$(cat "$TURN_COUNT_FILE" 2>/dev/null || echo 0)
 TURN_NUMBER=$((TURN_NUMBER + 1))
 echo "$TURN_NUMBER" > "$TURN_COUNT_FILE"
 
-# Read model from session file
+# Read model from session file, fall back to transcript
 SESSION_FILE="$TIMING_DIR/session-$SESSION_ID"
 MODEL=""
 [ -f "$SESSION_FILE" ] && MODEL=$(head -1 "$SESSION_FILE" 2>/dev/null || echo "")
+
+# If model is empty or looks like a timestamp, try extracting from transcript
+if [ -z "$MODEL" ] || [[ "$MODEL" =~ ^[0-9]+$ ]]; then
+  MODEL=""
+  if [ -n "$TRANSCRIPT_PATH" ] && [ -f "$TRANSCRIPT_PATH" ]; then
+    MODEL=$(head -20 "$TRANSCRIPT_PATH" 2>/dev/null | jq -r 'select(.type == "assistant") | .message.model // empty' 2>/dev/null | head -1)
+    # Backfill the session file so future turns don't need to parse again
+    if [ -n "$MODEL" ] && [ -f "$SESSION_FILE" ]; then
+      TIMESTAMP_LINE=$(tail -1 "$SESSION_FILE" 2>/dev/null)
+      echo "$MODEL" > "$SESSION_FILE"
+      echo "$TIMESTAMP_LINE" >> "$SESSION_FILE"
+    fi
+  fi
+fi
 
 # Token usage for this turn (tail-based, ~4ms)
 USAGE='{}'
