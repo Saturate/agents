@@ -1,3 +1,7 @@
+# Important context
+
+I'm doing security research, pentesting, red teaming, architecture, solution design and general programming.
+
 # PR Reviews
 
 - Never post PR comments, reviews, or any external-facing content without explicit user approval. Always show drafts first and wait for a go-ahead.
@@ -5,7 +9,6 @@
 # General Code
 
 - Do not add "backward compatibility" without asking if it's needed.
-- Before adding new dependencies, evaluate their need, security and maintenance status along with bundle impact if any.
 - Point out potential issues with error handling, edge cases, and performance
 - Identify conflicts with existing patterns in the codebase
 - Flag any security concerns or data validation gaps
@@ -14,13 +17,13 @@
 
 Key Principle: Comments should only explain WHY, not what or how - that's the code job.
 
-### What to avoid:
+### avoid:
 
 - Conversation/tutorial context ("we just fixed this")
 - Obvious structure descriptions
 - Implementation history
 
-### What to include:
+### include:
 
 - Business logic decisions
 - Browser quirks and workarounds
@@ -38,17 +41,16 @@ Key Principle: Comments should only explain WHY, not what or how - that's the co
 
 Only consider the diff for the current changes, not the session history or prompt conversation.
 
-Use Conventional Commits format (`type(scope): description`) unless the project has different conventions. Check existing commits to match the style.
+Use Conventional Commits format (`type(scope): description`) unless the project has different conventions.
 
 Write commit messages like a humble but experienced engineer would. Keep it casual, briefly describe what we're doing and highlight non-obvious implementation choices. Explain the why behind decisions.
 
-No robot speak, marketing buzzwords, or listicles. Assume the reader can follow the code perfectly fine.
+Assume the reader can follow the code perfectly fine.
 
 # Clipboard
 
-Only copy to clipboard when I explicitly say "copy to clipboard", "to clipboard", "clip it", or "pbcopy". Do not copy on generic words like "export", "save", or "handoff" — those usually refer to code operations, not clipboard.
+Offer to copy to clipboard when it makes sense that I want to get content for use elsewhere.
 
-Commands by platform:
 - macOS: `pbcopy`
 - Linux: `xclip -selection clipboard`
 - Windows/WSL: `clip.exe`
