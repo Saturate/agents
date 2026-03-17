@@ -19,6 +19,7 @@
       "Bash(git show:*)",
       "Bash(git blame:*)",
       "Bash(git remote:*)",
+      "Bash(cd:*)",
       "Bash(git tag:*)",
       "Bash(which:*)",
       "WebSearch",
@@ -216,7 +217,9 @@
       "Bash(git push --force:*)",
       "Bash(git branch -D:*)"
     ],
-    "ask": ["Bash(git push:*)"]
+    "ask": [
+      "Bash(git push:*)"
+    ]
   },
   "statusLine": {
     "type": "command",
