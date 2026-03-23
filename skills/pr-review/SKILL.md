@@ -138,6 +138,28 @@ From the changed file list, detect the tech stack and load **only** the relevant
 
 Load multiple if the diff spans stacks (e.g. a full-stack PR touches both `.cs` and `.tsx`).
 
+## Step 2c: Review Existing Comments (PR URL only)
+
+When reviewing via PR URL, fetch existing review comments and threads before starting your own review:
+
+**GitHub:**
+```text
+gh pr view $pr_number --repo $owner/$repo --comments
+gh api repos/$owner/$repo/pulls/$pr_number/comments  # inline review comments
+```
+
+**Azure DevOps:**
+```text
+az repos pr thread list --id $pr_number --organization https://dev.azure.com/$org --project "$project"
+```
+
+For each existing comment thread:
+- **Read the comment** and the code it references
+- **Evaluate** whether the feedback is valid, already addressed, or missed something
+- **Note your assessment** for the Existing Discussion section of your review output
+
+Skip resolved/closed threads — focus on active discussions.
+
 ## Review Checklist
 
 Use this checklist to guide your review, together with the language-specific issue references loaded above.
@@ -230,6 +252,7 @@ Structure your review like this (see [references/review-template.md](references/
 
 - **Summary:** One line verdict (Good to merge / Has issues / Needs work)
 - **PR Quality:** Evaluate title, description, screenshots (review this first)
+- **Existing Discussion:** Respond to active comment threads — agree, disagree, or add context (PR URL only)
 - **Critical:** Security, data loss, crashes - must fix before merge
 - **Important:** Bugs, performance, missing tests - should fix
 - **Minor:** Quality improvements - nice to have

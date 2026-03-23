@@ -8,12 +8,13 @@ Use this template structure for code review outputs.
 
 1. [Summary](#summary)
 2. [PR Quality](#pr-quality)
-3. [Critical](#critical)
-4. [Important](#important)
-5. [Minor](#minor)
-6. [Questions](#questions)
-7. [Prevent This](#prevent-this)
-8. [Positive Notes](#positive-notes)
+3. [Existing Discussion](#existing-discussion)
+4. [Critical](#critical)
+5. [Important](#important)
+6. [Minor](#minor)
+7. [Questions](#questions)
+8. [Prevent This](#prevent-this)
+9. [Positive Notes](#positive-notes)
 
 ---
 
@@ -36,6 +37,25 @@ Good to merge with minor fixes
 ⚠️ This changes the checkout button behavior but has no screenshots showing the disabled state. Please add a screenshot showing:
 - Button in normal state
 - Button in processing/disabled state
+
+---
+
+## Existing Discussion
+
+### @jane-dev on `src/services/payment.ts:45`
+> "Should we add retry logic here for transient failures?"
+
+**Agree** — the payment gateway can return 503 during deployments. A retry with exponential backoff (2-3 attempts) would improve reliability. See the error handling section below for a suggested implementation.
+
+### @bob-reviewer on `src/api/users.ts:42`
+> "Is this query safe?"
+
+**Agree, and it's worse than noted** — this is a SQL injection vulnerability, not just a safety concern. Flagged as Critical below.
+
+### @alice-lead on `src/utils/cache.ts:12`
+> "Can we make this timeout configurable?"
+
+**Disagree for now** — adding config for a single timeout adds complexity without clear benefit. If more timeouts become configurable later, revisit. The magic number should be a named constant though (flagged as Minor below).
 
 ---
 
