@@ -6,7 +6,7 @@ allowed-tools: Read Grep Glob Bash
 argument-hint: "[branch-name or PR URL]"
 metadata:
   author: Saturate
-  version: "2.0"
+  version: "3.0"
 ---
 
 # Code Review
@@ -30,29 +30,16 @@ The skill accepts optional arguments to determine what to review:
 
 ## Step 0: Read Project Guidelines
 
-**Before reviewing code, read project-specific guidelines:**
+**Before reviewing code, scan for project-specific guidelines:**
 
-1. Check for `CLAUDE.md` in the repository root
+1. Check for `CLAUDE.md` or `AGENT.md` in the repository root
 2. Check for global guidelines at `~/.claude/CLAUDE.md`
-3. Extract key rules to check during review:
-   - Type safety requirements (no casts, no `any`, etc.)
-   - Testing requirements
-   - Code style preferences
-   - Backward compatibility rules
+3. Scan `README.md` and any `docs/` directory for coding standards or contribution guides
+4. Extract any rules relevant to code review (type safety, testing, style, backward compatibility, etc.)
 
-**Common patterns to extract:**
-```text
-# Look for type safety rules
-grep -i "never cast\|no any\|no type assertion" CLAUDE.md ~/.claude/CLAUDE.md
+These project-specific rules become additional checklist items during your review. Flag violations as Important or Critical depending on severity.
 
-# Look for testing requirements
-grep -i "test\|coverage" CLAUDE.md ~/.claude/CLAUDE.md
-
-# Look for git/commit rules
-grep -i "commit\|backward compat" CLAUDE.md ~/.claude/CLAUDE.md
-```
-
-If no CLAUDE.md exists, proceed with general best practices only.
+If no guideline files exist, proceed with general best practices only.
 
 ## Step 1: Determine What to Review
 
@@ -75,23 +62,21 @@ git stash push -m "pr-review: temporary stash" 2>/dev/null && stashed=true || st
 if [[ "$args" =~ ^https?:// ]]; then
   # It's a URL, determine platform
   if [[ "$args" =~ github\.com ]]; then
-    # GitHub PR detected - READ references/github-pr-integration.md for implementation
-    # Follow the complete workflow in that file to:
-    # - Extract owner, repo, PR number from URL
-    # - Use gh CLI to get branch name
-    # - Checkout branch for review
+    # GitHub PR - READ references/github-pr-integration.md
+    # Extracts: owner, repo, PR number, title, description, author
+    # Checks out the branch for review
   elif [[ "$args" =~ dev\.azure\.com|visualstudio\.com ]]; then
-    # Azure DevOps PR detected - READ references/azure-pr-integration.md for implementation
-    # Follow the complete workflow in that file to:
-    # - Extract org, project, repo, PR number from URL
-    # - Use az CLI to get branch name
-    # - Checkout branch for review
+    # Azure DevOps PR - READ references/azure-pr-integration.md
+    # Extracts: org, project, repo, PR number, title, description, author, work items
+    # Checks out the branch for review
   else
     echo "❌ Unsupported PR URL. Supports GitHub and Azure DevOps only."
     exit 1
   fi
 fi
 ```
+
+**Keep the PR metadata** (title, description, author, work items) — you'll need it for the PR Quality section of the review.
 
 **2. If not URL, treat as branch name:**
 ```text
@@ -140,11 +125,24 @@ git log "origin/$base...HEAD" --oneline
 
 **Only read and review files that appear in `git diff --name-only`.** Do not explore the full codebase. Check the diff first to understand what changed, then read specific files only when you need more context than the diff provides (e.g. to understand how a changed function is called).
 
+## Step 2b: Detect Tech Stack and Load Relevant Issues
+
+From the changed file list, detect the tech stack and load **only** the relevant issue reference files:
+
+| Files in diff | Load reference |
+|---|---|
+| `*.ts`, `*.tsx`, `*.js`, `*.jsx`, `*.vue`, `*.svelte` | [references/issues-typescript.md](references/issues-typescript.md) |
+| `*.cs`, `*.csproj`, `*.sln`, `*.razor` | [references/issues-dotnet.md](references/issues-dotnet.md) |
+| `*.go`, `go.mod`, `go.sum` | [references/issues-go.md](references/issues-go.md) |
+| Any files | [references/issues-general.md](references/issues-general.md) — always load |
+
+Load multiple if the diff spans stacks (e.g. a full-stack PR touches both `.cs` and `.tsx`).
+
 ## Review Checklist
 
-Use this checklist to guide your review. Need examples of what to look for? Check out [references/common-issues.md](references/common-issues.md) for code patterns.
+Use this checklist to guide your review, together with the language-specific issue references loaded above.
 
-### PR Quality (Review First)
+### PR Quality (Review First — when reviewing a PR URL)
 - [ ] Title is clear and descriptive (not "fix bug" or "update code")
 - [ ] Description explains WHY, not just WHAT
 - [ ] Complex changes have explanation or context
@@ -154,6 +152,8 @@ Use this checklist to guide your review. Need examples of what to look for? Chec
 - [ ] Work items are appropriate for the changes (Azure DevOps)
 - [ ] Description helps reviewers understand impact
 - [ ] PR size is reasonable — flag if >500 lines changed, suggest splitting if it mixes unrelated concerns
+
+When reviewing a branch (no PR URL), skip title/description/work item checks — evaluate the code only.
 
 ### Security (Critical)
 - [ ] Input validation and sanitization
@@ -186,9 +186,7 @@ Use this checklist to guide your review. Need examples of what to look for? Chec
 - [ ] No unnecessary complexity or clever code
 - [ ] Duplication worth extracting
 - [ ] Names match what they do
-- [ ] **Follows project guidelines in CLAUDE.md (if present)**
-- [ ] **No type casts or non-null assertions - use type narrowing instead**
-- [ ] No "any" types - use proper types or "unknown" with narrowing
+- [ ] **Follows project guidelines (CLAUDE.md, AGENT.md, README, docs)**
 
 ### Accessibility (Important — UI changes only)
 - [ ] Interactive elements are keyboard accessible (focusable, operable without mouse)
@@ -212,10 +210,15 @@ Use this checklist to guide your review. Need examples of what to look for? Chec
 - [ ] Avoids unnecessary coupling
 - [ ] Database migrations are safe: non-destructive, backwards-compatible while old code may still run (avoid column renames/drops without a transition period, ensure nullable or defaulted new columns)
 
-## Step 3: Restore Original State
+## Step 3: Follow Up
 
-After completing the review, return to where the user was:
+After presenting the review, ask if the user wants to:
+- **Discuss** any findings or ask questions about the PR
+- **Fix** any of the issues found (apply changes directly)
+- **Post** the review as a PR comment (draft first, wait for approval)
+- **Switch back** to `{original_branch}` when done
 
+Stay on the reviewed branch until the user is finished. When they're ready to move on:
 ```text
 git checkout "$original_branch"
 [ "$stashed" = "true" ] && git stash pop
@@ -236,11 +239,14 @@ Structure your review like this (see [references/review-template.md](references/
 
 ## Guidelines
 
-- **Check CLAUDE.md first** - Read project guidelines before reviewing code
-- Be specific: file:line, what's wrong, why it matters, how to fix
+- **Read project guidelines first** — CLAUDE.md, AGENT.md, README, docs
+- **Use exact line numbers** from the actual source files, not from diff output. Read the file to confirm line numbers before reporting.
+- **Include deep links when reviewing a PR URL:**
+  - **Azure DevOps:** `https://dev.azure.com/{org}/{project}/_git/{repo}/pullrequest/{id}?path={filePath}&line={start}&lineEnd={end}&lineStartColumn=1&lineEndColumn=1&type=2&lineStyle=plain&_a=files`
+  - **GitHub:** `https://github.com/{owner}/{repo}/pull/{id}/files#diff-{hash}L{line}`
 - Skip style issues that linters catch
 - Explain impact, not just "this is wrong"
-- Consider trade-offs - sometimes simple is better than perfect
+- Consider trade-offs — sometimes simple is better than perfect
 - Briefly note if something is done well, but keep it short
 - **Flag project guideline violations as Important or Critical**
 
@@ -250,9 +256,9 @@ Structure your review like this (see [references/review-template.md](references/
 ```markdown
 ### Important
 
-**3. Type cast violates CLAUDE.md guideline**
+**3. Violates project guideline**
 **File:** `app.vue:28`
-**Guideline:** "Never cast types - always narrow them"
+**Source:** CLAUDE.md — "Never cast types - always narrow them"
 **Current:**
 \`\`\`typescript
 const redirect = content.entry.item as IRedirect
@@ -329,7 +335,8 @@ Only suggest mitigations for recurring patterns or critical issues. Don't sugges
 
 ## References
 
-Need more guidance? Check these out:
-
-- **[Review Template](references/review-template.md)** - What your review output should look like, with severity categories and example issues
-- **[Common Issues](references/common-issues.md)** - Quick reference of problems that come up often in reviews, with good/bad code examples
+- **[Review Template](references/review-template.md)** - Output structure with severity categories and example issues
+- **[General Issues](references/issues-general.md)** - Security, logic bugs, code quality, DB migrations (always loaded)
+- **[TypeScript Issues](references/issues-typescript.md)** - Type safety, TS/JS patterns, error handling, UI/accessibility, testing
+- **[.NET Issues](references/issues-dotnet.md)** - C#/.NET patterns, Entity Framework, async pitfalls
+- **[Go Issues](references/issues-go.md)** - Error handling, concurrency, naming, performance
