@@ -144,21 +144,34 @@ When reviewing via PR URL, fetch existing review comments and threads before sta
 
 **GitHub:**
 ```text
+# Get current user
+gh api user --jq '.login'
+
 gh pr view $pr_number --repo $owner/$repo --comments
 gh api repos/$owner/$repo/pulls/$pr_number/comments  # inline review comments
 ```
 
 **Azure DevOps:**
 ```text
+# Get current user
+az ad signed-in-user show --query displayName -o tsv
+
 az repos pr thread list --id $pr_number --organization https://dev.azure.com/$org --project "$project"
 ```
 
-For each existing comment thread:
-- **Read the comment** and the code it references
-- **Evaluate** whether the feedback is valid, already addressed, or missed something
-- **Note your assessment** for the Existing Discussion section of your review output
+**How to handle comments:**
 
-Skip resolved/closed threads — focus on active discussions.
+**Active threads from others:**
+- Evaluate whether the feedback is valid, already addressed, or missed something
+- Note your assessment (agree/disagree/context) for the Existing Discussion section
+
+**Active threads from the current user (our own comments):**
+- Skip these in the Existing Discussion section — don't agree/disagree with yourself
+- But do check: has the author addressed our feedback? If not, flag it as unresolved
+
+**Resolved/closed threads:**
+- Don't skip these blindly — check if the resolution actually addressed the concern in the code
+- If a thread was resolved but the underlying issue is still present, flag it as "Resolved but not fixed"
 
 ## Review Checklist
 

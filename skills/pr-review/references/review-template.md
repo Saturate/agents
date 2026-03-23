@@ -57,6 +57,16 @@ Good to merge with minor fixes
 
 **Disagree for now** — adding config for a single timeout adds complexity without clear benefit. If more timeouts become configurable later, revisit. The magic number should be a named constant though (flagged as Minor below).
 
+### Our comment on `src/api/auth.ts:89` — unresolved
+> "This token validation should check expiry before checking signature"
+
+**Not addressed** — the code still checks signature first. The author hasn't responded.
+
+### @bob-reviewer on `src/models/user.ts:23` — resolved but not fixed
+> "This nullable column needs a migration default"
+
+**Resolved but the issue remains** — thread was closed but the migration at `db/migrations/003.sql:12` still adds the column as `NOT NULL` without a default. Flagged as Important below.
+
 ---
 
 ## Critical
