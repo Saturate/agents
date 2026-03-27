@@ -124,6 +124,19 @@ Surface these issues with full context right away - don't bury them:
 - Missing error handling in paths that matter
 - Race conditions in how data is handled
 
+**CI/CD Pipeline Security**
+Check for pipeline config files and audit them for security issues:
+```bash
+ls .github/workflows/*.yml .github/workflows/*.yaml azure-pipelines.yml .gitlab-ci.yml 2>/dev/null
+```
+If pipeline files exist, see [references/ci-cd-security.md](references/ci-cd-security.md) for the full checklist. Key things to catch:
+- `pull_request_target` with checkout of PR code (secret exfiltration)
+- Script injection via untrusted input in `run:` blocks
+- Actions pinned to tags instead of SHA hashes
+- Missing permissions blocks (defaults to write-all)
+- Hardcoded secrets in pipeline config
+- No security scanning in CI
+
 ### 5. High-Level Findings (Summary Only)
 
 Organize what you found into categories with counts and brief summaries. Need help with the full category breakdown? Check [references/report-template.md](references/report-template.md).
@@ -147,7 +160,8 @@ Structure your audit report like this (see [references/report-template.md](refer
 1. **Tool Check** - What tools are available, what's missing
 2. **Tech Stack** - Languages, frameworks, cloud platform, CI/CD
 3. **Security Scan Results** - What trufflehog, npm audit, and OWASP checks found
-4. **TypeScript Check** - Strict mode status, any usage, type casting
+4. **CI/CD Pipeline Security** - Workflow permissions, secret handling, action pinning, trigger safety
+5. **TypeScript Check** - Strict mode status, any usage, type casting
 5. **Accessibility Check** - Missing alt text, ARIA labels, keyboard support
 6. **Monitoring/Observability** - Error tracking, logging, health endpoints
 7. **Performance** - If Chrome MCP is available and user provided a URL
@@ -211,6 +225,7 @@ Need more detailed guidance? Check these references:
 - **[Tech Stack Detection](references/tech-stack-detection.md)** - How to figure out what package managers, frameworks, cloud platforms, and IaC tools they're using
 - **[Secret Scanning Reference](references/secret-scanning.md)** - Complete guide to running TruffleHog on both current files and git history, plus common patterns and how to fix them
 - **[OWASP Top 10 Reference](references/owasp-top-10.md)** - Detection patterns and grep commands for finding all OWASP Top 10 vulnerabilities, with severity guidelines
+- **[CI/CD Pipeline Security](references/ci-cd-security.md)** - GitHub Actions, Azure Pipelines, GitLab CI security issues and detection commands
 - **[Accessibility Checklist](references/accessibility-checklist.md)** - Practical commands for finding a11y issues and testing for WCAG compliance
 - **[Report Template](references/report-template.md)** - What the final report should look like, with example critical issues
 
