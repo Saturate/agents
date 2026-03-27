@@ -20,6 +20,7 @@ PR Creation Progress:
 - [ ] Step 1: Parsed user arguments
 - [ ] Step 2: Got current state (branch, remote, target branch)
 - [ ] Step 3: Analyzed commits (found commits to PR)
+- [ ] Step 3b: Checked for PR template
 - [ ] Step 4: Generated PR title and description
 - [ ] Step 5: Confirmed PR content with user
 - [ ] Step 6: Created PR successfully
@@ -206,9 +207,31 @@ git log $target_branch..$current_branch --format="%H%n%s%n%b%n---"
 git diff --stat $target_branch...$current_branch
 ```
 
+## Step 3b: Check for PR Template
+
+Before generating a description, check if the repo has a PR template. If one exists, use its structure instead of the default templates.
+
+```bash
+# GitHub PR templates (check all common locations)
+cat .github/PULL_REQUEST_TEMPLATE.md 2>/dev/null ||
+cat .github/pull_request_template.md 2>/dev/null ||
+cat docs/pull_request_template.md 2>/dev/null ||
+cat PULL_REQUEST_TEMPLATE.md 2>/dev/null
+```
+
+For Azure DevOps, check if branch policies enforce a template (can't detect from code, but the template files are often in the same locations).
+
+If a template is found:
+- Use its sections and structure as the format for the generated description
+- Fill in each section based on the commit analysis
+- Don't add sections the template doesn't have
+- Don't skip sections the template does have (fill them in or mark as N/A)
+
+If no template is found, use the default format from the description guide.
+
 ## Step 4: Generate PR Title and Description
 
-If the user didn't provide `--title` or `--description`, generate them following the [PR Description Guide](references/pr-description-guide.md).
+If the user didn't provide `--title` or `--description`, generate them following the repo's PR template (if found in Step 3b) or the [PR Description Guide](references/pr-description-guide.md).
 
 ### Title Generation (if not provided)
 
