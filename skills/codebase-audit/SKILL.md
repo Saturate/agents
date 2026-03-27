@@ -55,6 +55,13 @@ Parse the JSON output from these tools and integrate what you find into the audi
 - Count how many times `any` is used explicitly (this defeats type safety)
 - Count type assertions using `as` or `<Type>` (suggest using type narrowing instead)
 
+**Go projects (if go.mod exists):**
+- Run `go vet ./...` and `go build ./...` to catch obvious issues
+- Run `go test -race -short ./...` to detect data races
+- Count discarded errors (`_ :=` patterns) — every one is a potential silent failure
+- Check for `govulncheck ./...` if available
+- See [references/framework-patterns-go.md](references/framework-patterns-go.md) for the full anti-pattern checklist
+
 **OWASP Top 10 checks:** See [references/owasp-top-10.md](references/owasp-top-10.md) for vulnerability patterns and detection commands. Report findings as **critical** with file:line, what the risk is, and how to fix it.
 
 **Accessibility checks:** Check [references/accessibility-checklist.md](references/accessibility-checklist.md) for a11y detection commands and testing procedures. Report these as **important** because they exclude real users from using the app.
@@ -75,6 +82,7 @@ Once you know what framework they're using, check the relevant patterns guide:
 - **Nuxt/Vue** → [references/framework-patterns-nuxt.md](references/framework-patterns-nuxt.md)
 - **ASP.NET Core / .NET** → [references/framework-patterns-dotnet.md](references/framework-patterns-dotnet.md)
 - **Entity Framework** → [references/entity-framework.md](references/entity-framework.md)
+- **Go** → [references/framework-patterns-go.md](references/framework-patterns-go.md)
 - **Other frameworks** → Use WebSearch to look up current best practices and common mistakes
 
 **Performance testing (if Chrome MCP is available):**
@@ -211,6 +219,7 @@ Need more detailed guidance? Check these references:
 - **[Nuxt / Vue Patterns](references/framework-patterns-nuxt.md)** - Best practices, common anti-patterns, and what to check in Nuxt/Vue projects
 - **[.NET Framework Patterns](references/framework-patterns-dotnet.md)** - ASP.NET Core, async patterns, DI, testing, and code quality anti-patterns for .NET 6+
 - **[Entity Framework Patterns](references/entity-framework.md)** - Performance, security, and correctness issues in Entity Framework Core
+- **[Go Patterns](references/framework-patterns-go.md)** - Error handling, concurrency, performance, security, and testing anti-patterns for Go projects
 - **[.NET Security: Auth](references/dotnet-security-auth.md)** - Authentication, authorization, CSRF, and redirect validation for ASP.NET Core
 - **[.NET Security: Data](references/dotnet-security-data.md)** - SQL injection, deserialization, mass assignment, input validation, and XXE
 - **[.NET Security: Crypto](references/dotnet-security-crypto.md)** - Secrets management, cryptographic failures, and security headers
