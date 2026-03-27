@@ -393,6 +393,8 @@ Display:
 - Reviewers (if added)
 - Labels/Work items (if added)
 
+Then suggest: "Want me to review the changes before you share this with the team?" If yes, try to invoke the `pr-review` skill with the PR URL. If that skill isn't available, do a quick inline review of the diff yourself (bugs, security, missing error handling).
+
 ## Error Handling Reference
 
 | Error | Message | Resolution |
