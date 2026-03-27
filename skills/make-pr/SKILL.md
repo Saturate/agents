@@ -5,7 +5,7 @@ compatibility: Requires git repository, gh CLI for GitHub or az CLI + azure-devo
 allowed-tools: Bash
 metadata:
   author: Saturate
-  version: "1.3"
+  version: "2.0"
 ---
 
 You are helping the user create a pull request on GitHub or Azure DevOps. Follow these steps:
@@ -90,6 +90,15 @@ labels=""             # Space-separated list if provided (GitHub)
 work_items=""         # Space-separated list if provided (Azure)
 ```
 
+**Auto-detect work items from branch name (Azure DevOps):**
+
+If no `--work-items` provided and platform is Azure DevOps, extract IDs from the branch name:
+```bash
+# Common patterns: feature/12345-description, bugfix/12345, 12345-some-feature
+branch_work_items=$(echo "$current_branch" | grep -oE '[0-9]{3,6}' | head -3)
+```
+If found, ask: "Detected work item(s) #[IDs] from branch name. Link them to the PR?"
+
 ## Step 2: Get Current State and Validate
 
 **Get current branch:**
@@ -98,11 +107,34 @@ current_branch=$(git branch --show-current)
 ```
 If empty (detached HEAD) → Exit with: "Cannot create PR from detached HEAD state. Please checkout a branch first."
 
-**Verify branch is pushed to remote:**
+**Check for uncommitted changes:**
+```bash
+git status --porcelain
+```
+If there are uncommitted changes, warn the user: "You have uncommitted changes. These won't be included in the PR. Continue anyway, or commit first?"
+
+**Check for existing PR on this branch:**
+
+**GitHub:**
+```bash
+gh pr list --head "$current_branch" --state open --json url,title,number
+```
+
+**Azure DevOps:**
+```bash
+az repos pr list --source-branch "$current_branch" --status active --query '[].{id:pullRequestId,title:title}' -o json
+```
+
+If a PR already exists, show it and ask: "A PR already exists for this branch: [URL]. Open it instead, or create a new one?"
+
+**Ensure branch is pushed to remote:**
 ```bash
 git rev-parse --verify origin/$current_branch 2>/dev/null
 ```
-If fails → Exit with: "Branch '$current_branch' is not pushed to remote. Push it first with:\n  git push -u origin $current_branch"
+If the branch isn't on the remote yet, push it automatically:
+```bash
+git push -u origin "$current_branch"
+```
 
 **Determine target branch:**
 
@@ -202,34 +234,54 @@ Follow these **style principles**:
 - **Avoid:** Robot speak, marketing language, obvious observations
 - **Include:** Non-obvious choices, trade-offs, constraints
 
-**Template:**
-```
-[1-2 sentence intro: what changed and why]
+**Scale the description to match the PR size:**
 
-[Optional paragraph: Context on non-obvious decisions, trade-offs, or constraints]
+**Small PR (1-2 commits, <50 lines changed):**
+Just a sentence or two. No sections needed.
+```
+The logout button was hidden behind the nav on small screens. Bumped the z-index and added a viewport test.
+```
+
+**Medium PR (3-5 commits, 50-300 lines):**
+Short intro + bullet points if it helps.
+```
+Switched from polling to SSE for notifications because polling was hammering the DB during peak hours.
+
+- EventSource with automatic reconnection
+- Polling still works as fallback for older browsers
+- Left the old endpoint up since the mobile app still hits it
+```
+
+**Large PR (5+ commits, 300+ lines):**
+More context, explain the why, call out risk areas.
+```
+[What changed and why, 1-2 sentences]
+
+[More context if needed: why this approach, what you considered, any gotchas]
 
 ## Changes
-- Key change 1 (focus on why, not what)
-- Key change 2
-- Key change 3
-
-## Testing
-- [ ] Tested locally
-- [ ] Added/updated tests
-- [ ] Verified [relevant scenario]
+- What changed and why (not just "added X")
+- Another change
+- Another change
 ```
+
+Don't add a testing section by default. If something interesting was done for testing, mention it naturally in the description. Instead, call out risk areas so reviewers know where to focus: "this touches the payment path" or "low risk, just config".
+
+**If there are UI changes**, include screenshots or say they're needed.
+
+**If something breaks for consumers**, add a `## Breaking Changes` section with what breaks and how to migrate.
+
+**Writing style:**
+Write like a human, avoid AI patterns. No em dashes, use commas, hyphens, or just split the sentence.
 
 **Analyzing commits for description:**
 1. Parse all commit subjects and bodies
 2. Identify the main purpose/theme
 3. Extract context from commit bodies (especially lines explaining "why")
-4. Look at diff summary to understand scope
+4. Look at diff summary to understand scope and pick the right size template
 5. Note any trade-offs mentioned in commits
-6. Generate intro sentence: what changed + why it matters
-7. List 3-5 key changes (avoid obvious ones)
-8. Add testing checklist
 
-See [references/pr-description-guide.md](references/pr-description-guide.md) for detailed guidance and examples.
+See [references/pr-description-guide.md](references/pr-description-guide.md) for detailed examples and tone guidance.
 
 ## Step 5: Confirm PR Content with User
 
@@ -327,7 +379,7 @@ Display:
 | CLI missing | Platform-specific installation message | Install gh or az CLI |
 | Not authenticated | Platform-specific auth message | Run auth login command |
 | Detached HEAD | "Cannot create PR from detached HEAD" | Checkout a branch |
-| Branch not pushed | "Branch not pushed. Run: git push -u origin $branch" | Push the branch |
+| Branch not pushed | Auto-pushes with `git push -u origin $branch` | Automatic |
 | Target branch not found | "Target branch '$branch' not found in remote" + list available | Use --base with valid branch |
 | Cannot determine target | "Cannot determine target branch" + list available | Specify with --base flag |
 | PR exists | "PR already exists: [URL]" | Show existing PR |
