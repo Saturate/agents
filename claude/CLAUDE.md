@@ -39,13 +39,7 @@ Key Principle: Comments should only explain WHY, not what or how - that's the co
 
 # Git Commits
 
-Only consider the diff for the current changes, not the session history or prompt conversation.
-
-Use Conventional Commits format (`type(scope): description`) unless the project has different conventions.
-
-Write commit messages like a humble but experienced engineer would. Keep it casual, briefly describe what we're doing and highlight non-obvious implementation choices. Explain the why behind decisions.
-
-Assume the reader can follow the code perfectly fine.
+Use the `commit` skill for commit guidelines.
 
 # Clipboard
 

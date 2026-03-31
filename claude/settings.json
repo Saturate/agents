@@ -228,7 +228,7 @@
   },
   "enabledPlugins": {
     "frontend-design@claude-plugins-official": true,
-    "code-review@claude-plugins-official": true,
+    "code-review@claude-plugins-official": false,
     "typescript-lsp@claude-plugins-official": true,
     "swift-lsp@claude-plugins-official": true,
     "observability@Saturate-claude": true
