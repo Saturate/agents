@@ -101,6 +101,7 @@
       "Bash(go doc:*)",
       "Bash(cargo build:*)",
       "Bash(ls:*)",
+      "Bash(mkdir:*)",
       "Bash(xargs:*)",
       "Bash(pnpm dev)",
       "Bash(pnpm lint:*)",
