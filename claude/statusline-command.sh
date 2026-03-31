@@ -202,24 +202,56 @@ if [ -n "$cost_data" ] && [ "$cost_data" != "null" ]; then
 fi
 
 # ── Rate limits ───────────────────────────────────────────────────
-rate_segment=""
-if [ -n "$rate_limits" ] && [ "$rate_limits" != "null" ]; then
-    five_hr=$(echo "$rate_limits" | jq '.five_hour.used_percentage // empty')
-    seven_day=$(echo "$rate_limits" | jq '.seven_day.used_percentage // empty')
+fmt_countdown() {
+    local secs=$1
+    if [ "$secs" -le 0 ]; then
+        echo "now"
+    elif [ "$secs" -ge 86400 ]; then
+        local d=$((secs / 86400))
+        local h=$(( (secs % 86400) / 3600 ))
+        echo "${d}d${h}h"
+    elif [ "$secs" -ge 3600 ]; then
+        local h=$((secs / 3600))
+        local m=$(( (secs % 3600) / 60 ))
+        echo "${h}h${m}m"
+    else
+        local m=$((secs / 60))
+        echo "${m}m"
+    fi
+}
 
-    if [ -n "$five_hr" ] && [ "$five_hr" != "null" ]; then
-        five_hr_int=$(printf "%.0f" "$five_hr")
+rate_segment=""
+now=$(date +%s)
+if [ -n "$rate_limits" ] && [ "$rate_limits" != "null" ]; then
+    five_hr_pct=$(echo "$rate_limits" | jq '.five_hour.used_percentage // empty')
+    five_hr_reset=$(echo "$rate_limits" | jq '.five_hour.resets_at // empty')
+
+    if [ -n "$five_hr_pct" ] && [ "$five_hr_pct" != "null" ]; then
+        five_hr_int=$(printf "%.0f" "$five_hr_pct")
         five_bar=$(make_bar "$five_hr_int" 8)
-        rate_segment="${FG_MAGENTA}5h${RST} ${five_bar} ${DIM}${five_hr_int}%${RST}"
+        five_countdown=""
+        if [ -n "$five_hr_reset" ] && [ "$five_hr_reset" != "null" ]; then
+            five_remaining=$((five_hr_reset - now))
+            five_countdown=" $(fmt_countdown "$five_remaining")"
+        fi
+        rate_segment="${FG_MAGENTA}${five_countdown}${RST} ${five_bar} ${DIM}${five_hr_int}%${RST}"
     fi
 
-    if [ -n "$seven_day" ] && [ "$seven_day" != "null" ]; then
-        seven_day_int=$(printf "%.0f" "$seven_day")
+    seven_day_pct=$(echo "$rate_limits" | jq '.seven_day.used_percentage // empty')
+    seven_day_reset=$(echo "$rate_limits" | jq '.seven_day.resets_at // empty')
+
+    if [ -n "$seven_day_pct" ] && [ "$seven_day_pct" != "null" ]; then
+        seven_day_int=$(printf "%.0f" "$seven_day_pct")
         seven_bar=$(make_bar "$seven_day_int" 8)
+        seven_countdown=""
+        if [ -n "$seven_day_reset" ] && [ "$seven_day_reset" != "null" ]; then
+            seven_remaining=$((seven_day_reset - now))
+            seven_countdown=" $(fmt_countdown "$seven_remaining")"
+        fi
         if [ -n "$rate_segment" ]; then
-            rate_segment="${rate_segment}  ${FG_MAGENTA}7d${RST} ${seven_bar} ${DIM}${seven_day_int}%${RST}"
+            rate_segment="${rate_segment}  ${FG_MAGENTA}${seven_countdown}${RST} ${seven_bar} ${DIM}${seven_day_int}%${RST}"
         else
-            rate_segment="${FG_MAGENTA}7d${RST} ${seven_bar} ${DIM}${seven_day_int}%${RST}"
+            rate_segment="${FG_MAGENTA}${seven_countdown}${RST} ${seven_bar} ${DIM}${seven_day_int}%${RST}"
         fi
     fi
 fi
