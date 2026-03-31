@@ -1,0 +1,29 @@
+name: Sync submodule in claude repo
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout claude repo
+        uses: actions/checkout@v4
+        with:
+          repository: Saturate/claude
+          token: ${{ secrets.CLAUDE_REPO_TOKEN }}
+          submodules: true
+
+      - name: Update skills submodule
+        run: git submodule update --remote skills
+
+      - name: Commit and push if changed
+        run: |
+          cd skills && SKILLS_SHA=$(git rev-parse --short HEAD) && cd ..
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add skills
+          git diff --cached --quiet && echo "Already up to date" && exit 0
+          git commit -m "chore(skills): update submodule to ${SKILLS_SHA}"
+          git push
