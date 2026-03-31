@@ -1,7 +1,6 @@
 ---
 name: commit
 description: Commits staged changes using Conventional Commits with auto-detected scope, work item linking, and secret scanning. Use when committing, making a commit, git commit, save changes, commit changes, commit my work, or when triggered by incremental-implementation.
-disable-model-invocation: true
 allowed-tools: Bash Read Grep Glob
 metadata:
   author: Saturate
