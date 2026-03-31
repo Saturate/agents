@@ -1,6 +1,6 @@
 # Agents
 
-Skills, plugins, and configuration for AI coding agents — works with Claude Code, OpenCode, and more.
+Skills, plugins, and configuration for AI coding agents. Works with Claude Code, OpenCode, and more.
 
 ## Structure
 
