@@ -18,8 +18,8 @@ LOG_DIR="$HOME/.claude/logs"
 TIMING_DIR="/tmp/claude-hook-timings"
 mkdir -p "$LOG_DIR" "$TIMING_DIR"
 
-# Loki endpoint — fully env-var driven, no-op when unset.
-# Set LOKI_URL, LOKI_USER, LOKI_PASS in your shell profile.
+# Loki endpoint — hooks may run without interactive shell, so source .zshenv as fallback
+[ -z "${LOKI_URL:-}" ] && [ -f "$HOME/.zshenv" ] && source "$HOME/.zshenv"
 LOKI_URL="${LOKI_URL:-}"
 
 # ── Stdin capture ────────────────────────────────────────────────────────────
@@ -99,11 +99,25 @@ push_loki() {
     --arg line "$line" \
     '{streams: [{stream: $labels, values: [[$ts, $line]]}]}')
 
-  curl -s -u "$LOKI_USER:$LOKI_PASS" \
-    "$LOKI_URL" \
-    -H "Content-Type: application/json" \
-    -d "$payload" \
-    >/dev/null 2>&1 &
+  {
+    local response http_code
+    response=$(curl -s -w "\n%{http_code}" -u "$LOKI_USER:$LOKI_PASS" \
+      "$LOKI_URL" \
+      -H "Content-Type: application/json" \
+      -d "$payload" 2>&1)
+    http_code=$(echo "$response" | tail -1)
+
+    if [ "$http_code" != "204" ] && [ "$http_code" != "200" ]; then
+      local body
+      body=$(echo "$response" | sed '$d' | head -1)
+      log_entry "loki-errors" "$(jq -cn \
+        --arg ts "$(utc_timestamp)" \
+        --argjson labels "$labels" \
+        --arg http_code "$http_code" \
+        --arg body "$body" \
+        '{timestamp: $ts, labels: $labels, http_code: $http_code, body: $body}')"
+    fi
+  } &
 }
 
 # ── Model pricing ────────────────────────────────────────────────────────────
