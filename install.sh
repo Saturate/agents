@@ -70,11 +70,14 @@ skipped_files=()
 backed_up_files=()
 
 # Backup and create symlink
+BACKUP_DIR="$HOME/.claude/.backups"
+mkdir -p "$BACKUP_DIR"
+
 backup_and_link() {
     local file=$1
     local source_path=$2
     local target_path=$3
-    local backup_path="${target_path}.backup"
+    local backup_path="$BACKUP_DIR/$(echo "$file" | tr '/' '_').backup"
 
     mv "$target_path" "$backup_path"
     if [ $? -ne 0 ]; then
