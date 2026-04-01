@@ -231,7 +231,7 @@
     "code-review@claude-plugins-official": false,
     "typescript-lsp@claude-plugins-official": true,
     "swift-lsp@claude-plugins-official": true,
-    "observability@Saturate-claude": true
+    "observability@Saturate-agents": true
   },
   "skipDangerousModePermissionPrompt": true
 }
