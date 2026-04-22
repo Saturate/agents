@@ -9,6 +9,12 @@
       "source": "./plugins/observability",
       "description": "Comprehensive hook logging - tracks tool usage, sessions, turns, prompts, subagents, compactions, notifications, and permissions with JSONL files and optional Loki push.",
       "version": "1.0.0"
+    },
+    {
+      "name": "skill-router",
+      "source": "./plugins/skill-router",
+      "description": "Injects a skill-routing meta-skill at session start and emits just-in-time skill advisories before high-signal Bash commands (npm install, cargo add, git commit, dotnet add package, etc).",
+      "version": "1.0.0"
     }
   ]
 }

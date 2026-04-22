@@ -212,14 +212,14 @@
       "mcp__azure-devops-belgium__advsec_get_alert_details"
     ],
     "deny": [
-      "Bash(rm -rf:*)",
       "Bash(git reset --hard:*)",
       "Bash(git clean -f:*)",
       "Bash(git push --force:*)",
       "Bash(git branch -D:*)"
     ],
     "ask": [
-      "Bash(git push:*)"
+      "Bash(git push:*)",
+      "Bash(rm -rf:*)"
     ]
   },
   "statusLine": {
@@ -231,7 +231,16 @@
     "code-review@claude-plugins-official": false,
     "typescript-lsp@claude-plugins-official": true,
     "swift-lsp@claude-plugins-official": true,
-    "observability@Saturate-agents": true
+    "observability@Saturate-agents": true,
+    "skill-router@Saturate-agents": true
+  },
+  "extraKnownMarketplaces": {
+    "Saturate-agents": {
+      "source": {
+        "source": "github",
+        "repo": "Saturate/agents"
+      }
+    }
   },
   "skipDangerousModePermissionPrompt": true
 }

@@ -1,329 +1,428 @@
 ---
 name: evaluating-dependencies
-description: Evaluates Node.js packages before installation by checking bundle size impact, comparing alternatives, verifying latest stable versions, and assessing maintenance status. Use when adding dependencies, installing packages, choosing between libraries, optimizing bundle size, or when user mentions npm install, yarn add, pnpm add, package selection, or asks about package recommendations.
-user-invocable: false
+description: Evaluates packages before installation across npm, pnpm, yarn, bun, cargo, pip, uv, go, and nuget. Checks footprint, maintenance status, alternatives, license, and security. Use when adding dependencies, choosing between libraries, optimizing bundle size, or running npm install, pnpm add, yarn add, bun add, cargo add, pip install, uv add, go get, or dotnet add package.
+user-invocable: true
 allowed-tools: Bash WebFetch WebSearch Read Grep
 metadata:
   author: Saturate
-  version: "1.0"
+  version: "2.0"
 ---
 
-# Dependency Evaluation
+# Evaluating Dependencies
 
-Evaluate Node.js packages before installation to make informed decisions about bundle size, maintenance status, and alternatives.
+Evaluate packages before installation — across ecosystems — to make informed decisions about footprint, maintenance, alternatives, license, and security.
 
-## Evaluation Workflow
+## Universal decision framework
 
-**For every dependency addition request, follow these steps:**
+Run these checks regardless of ecosystem. Tools differ; the questions don't.
 
 ```
 Evaluation Progress:
-- [ ] Step 1: Identify need and alternatives
-- [ ] Step 2: Check bundle sizes (bundlephobia)
-- [ ] Step 3: Verify latest versions (npm registry)
-- [ ] Step 4: Assess maintenance status
-- [ ] Step 5: Compare and recommend
-- [ ] Step 6: Install with latest stable version
+- [ ] 1. Need check            — do we actually need it? is it already in deps?
+- [ ] 2. Alternatives          — identify 2-4 options if no specific package requested
+- [ ] 3. Footprint             — size/impact (bundle, binary, import cost)
+- [ ] 4. Maintenance           — last release, release cadence, deprecation status
+- [ ] 5. Security              — known CVEs, audit results
+- [ ] 6. License               — compatible with the project
+- [ ] 7. Recommend             — pick one, justify briefly
+- [ ] 8. Install               — pinned version, correct dep category
 ```
 
-### Step 1: Identify Need and Alternatives
+### 1. Need check
 
-**If specific package requested** (e.g., "add lodash"):
-- Proceed to Step 2 with that package
-- Consider mentioning well-known alternatives if relevant
+Before considering *which* package, ask *whether*:
 
-**If generic need** (e.g., "add a date library"):
-- Identify 2-4 popular alternatives in that category
-- Examples:
-  - Date handling: `date-fns`, `dayjs`, `luxon`
-  - HTTP client: `axios`, `ky`, `got`
-  - State management: `zustand`, `jotai`, `redux`
-  - Validation: `zod`, `yup`, `joi`
-  - Testing: `vitest`, `jest`, `uvu`
+- Is it already installed? (`package.json`, `Cargo.toml`, `pyproject.toml`, `go.mod`, `*.csproj`, `Directory.Packages.props`)
+- Can the stdlib do it? (`Date` in JS, `datetime` in Python, `time` in Go, `chrono` in modern Rust projects)
+- Is it a one-liner we can inline?
 
-### Step 2: Check Bundle Sizes
+Adding a dep is a commitment — maintenance, security surface, lock file churn. Default to no.
 
-**Use bundlephobia to check bundle size impact:**
+### 2. Alternatives
 
-```bash
-# Check bundle size via bundlephobia
-curl -s "https://bundlephobia.com/api/size?package=<package>@latest" | jq
-```
+If the user gave a specific package, proceed to Step 3 with it. Mention obvious alternatives if relevant.
 
-**Extract key metrics:**
-- `size` - Minified size
-- `gzip` - Gzipped size (most important for actual impact)
-- `dependency_count` - How many dependencies it pulls in
+If the user gave a generic need ("a date library", "a JSON parser"), identify 2-4 well-known options so the comparison is real.
 
-**For multiple alternatives, compare:**
-```bash
-# Example: Compare date libraries
-curl -s "https://bundlephobia.com/api/size?package=dayjs@latest" | jq '.gzip'
-curl -s "https://bundlephobia.com/api/size?package=date-fns@latest" | jq '.gzip'
-curl -s "https://bundlephobia.com/api/size?package=luxon@latest" | jq '.gzip'
-```
+### 3. Footprint
 
-### Step 3: Verify Latest Versions
+"Footprint" is ecosystem-specific:
 
-**Check npm registry for latest version:**
+| Ecosystem | What to measure | How |
+|---|---|---|
+| npm/pnpm/yarn/bun | Gzipped bundle size + dep count | bundlephobia API |
+| cargo | Compiled binary impact, transitive deps | `cargo tree`, crates.io stats |
+| pip/uv | Install size, transitive deps | `pip show`, pypi metadata |
+| go | Transitive modules | `go mod graph`, pkg.go.dev |
+| nuget | Download size, transitive deps | `dotnet list package --include-transitive` |
 
-```bash
-# Get latest version
-npm view <package> version
+### 4. Maintenance
 
-# Get version info with dates
-npm view <package> time --json | jq '.modified'
+Red flags (any ecosystem):
 
-# Check for deprecated status
-npm view <package> deprecated
-```
+- Last release > 2 years ago with no activity
+- Deprecated (marked in registry, or replaced by a successor package)
+- Single maintainer with no recent activity
+- Issue tracker full of unanswered recent reports
 
-**Check multiple versions:**
-```bash
-# See all versions
-npm view <package> versions --json
+Green flags:
 
-# Get latest major versions
-npm view <package> dist-tags --json
-```
+- Released within the last ~6 months
+- Multiple maintainers or org-backed
+- Recent commits on the default branch
 
-### Step 4: Assess Maintenance Status
+### 5. Security
 
-**Check package health:**
+Run an audit tool for the ecosystem (see "Ecosystem playbooks" below). CVE-laden dependencies are worth a hard no — look for an alternative.
 
-```bash
-# Last publish date
-npm view <package> time.modified
+### 6. License
 
-# Weekly downloads (popularity)
-npm view <package> dist.tarball | xargs -I {} curl -s "https://api.npmjs.org/downloads/point/last-week/{}"
+Quick sanity check. MIT / Apache-2.0 / BSD are safe defaults. GPL/AGPL in a proprietary project is a conversation.
 
-# Check repository activity (if GitHub URL available)
-npm view <package> repository.url
-```
+### 7. Recommend
 
-**Red flags:**
-- ❌ Last updated >2 years ago
-- ❌ Marked as deprecated
-- ❌ Security vulnerabilities (check npm audit after install)
-- ❌ Very low download count (<1000/week)
-
-**Green flags:**
-- ✅ Updated within last 6 months
-- ✅ Active maintenance (regular releases)
-- ✅ High download count
-- ✅ TypeScript support built-in
-
-### Step 5: Compare and Recommend
-
-**Present comparison in this format:**
+Present in this format:
 
 ```
-Package Evaluation Results:
-
-Option 1: <package-name> (recommended)
-- Bundle size: X KB gzipped
-- Latest version: X.X.X
-- Last updated: X months ago
-- Weekly downloads: XXX,XXX
-- TypeScript: ✅ Built-in / ⚠️ @types required / ❌ None
-- Why: [Brief reason - smallest/fastest/most maintained/best DX]
+Option 1: <package> (recommended)
+- Footprint: <size / deps>
+- Latest: <version>
+- Last updated: <timeframe>
+- License: <spdx>
+- Why: <smallest / most maintained / best types / etc.>
 
 Option 2: <alternative>
-- Bundle size: X KB gzipped (XX% larger)
-- Latest version: X.X.X
-- Last updated: X months ago
-- Why not: [Brief reason - larger/older/less maintained]
+- …
+- Why not: <…>
 
-Recommendation: Install <package>@<version>
+Recommendation: install <package>@<version>
 ```
 
-**Decision criteria (in order of importance):**
-1. **Maintenance** - Is it actively maintained?
-2. **Bundle size** - How much does it add to the bundle?
-3. **Popularity** - Is it widely used and trusted?
-4. **TypeScript** - Does it have good type support?
-5. **Features** - Does it meet the requirements?
+### 8. Install
 
-### Step 6: Install with Latest Stable Version
+Pin the version. Detect the package manager from lockfiles, never guess.
 
-**Detect package manager first:**
+---
+
+## Ecosystem playbooks
+
+### npm / pnpm / yarn / bun
+
+**Detect the package manager:**
 
 ```bash
-if [ -f "bun.lockb" ]; then
-    PM="bun"
-elif [ -f "pnpm-lock.yaml" ]; then
-    PM="pnpm"
-elif [ -f "yarn.lock" ]; then
-    PM="yarn"
-else
-    PM="npm"
+if [ -f "bun.lockb" ]; then PM=bun
+elif [ -f "pnpm-lock.yaml" ]; then PM=pnpm
+elif [ -f "yarn.lock" ]; then PM=yarn
+else PM=npm
 fi
-echo "Using: $PM"
 ```
 
-**Install with explicit version:**
+**Footprint — bundlephobia:**
 
 ```bash
-# npm
-npm install <package>@<version>
-
-# pnpm
-pnpm add <package>@<version>
-
-# yarn
-yarn add <package>@<version>
-
-# bun
-bun add <package>@<version>
+curl -s "https://bundlephobia.com/api/size?package=<pkg>@latest" | jq '{size, gzip, dependencyCount}'
 ```
 
-**For dev dependencies, add -D flag:**
-```bash
-npm install -D <package>@<version>
-pnpm add -D <package>@<version>
-yarn add -D <package>@<version>
-bun add -d <package>@<version>
-```
-
-## Quick Reference Tables
-
-### Common Package Categories
-
-| Need | Top Alternatives | Recommendation |
-|------|-----------------|----------------|
-| Date handling | dayjs, date-fns, luxon | dayjs (smallest) or date-fns (most features) |
-| HTTP client | axios, ky, got, undici | ky (modern) or axios (most popular) |
-| Validation | zod, yup, joi | zod (TypeScript-first) |
-| Testing | vitest, jest, uvu | vitest (fastest) |
-| State (React) | zustand, jotai, redux | zustand (simplest) |
-| CSS-in-JS | styled-components, emotion | Check project conventions |
-| Icons | lucide-react, react-icons | lucide-react (smaller, tree-shakeable) |
-| Forms (React) | react-hook-form, formik | react-hook-form (better performance) |
-| UUID | uuid, nanoid | nanoid (smaller, faster) |
-| Lodash | lodash-es, radash, remeda | lodash-es (tree-shakeable) or avoid if possible |
-
-### Bundle Size Thresholds
-
-| Size (gzipped) | Impact | Action |
-|---------------|--------|--------|
-| < 5 KB | Negligible | ✅ Safe to add |
-| 5-20 KB | Small | ✅ Usually fine |
-| 20-50 KB | Medium | ⚠️ Consider alternatives |
-| 50-100 KB | Large | ⚠️ Justify the need |
-| > 100 KB | Very large | ❌ Look for lighter alternatives |
-
-## Special Cases
-
-### TypeScript Projects
-
-**Prefer packages with built-in types:**
-- ✅ `zod` - Types built-in
-- ⚠️ `joi` - Needs `@types/joi`
-
-**Check for types:**
-```bash
-npm view <package> types
-# or check for @types package
-npm view @types/<package> version
-```
-
-### Monorepo/Workspaces
-
-**For workspace dependencies:**
-```bash
-# npm
-npm install <package> --workspace=packages/web
-
-# pnpm
-pnpm add <package> --filter packages/web
-
-# yarn
-yarn workspace packages/web add <package>
-```
-
-### Alternative: Tree-shakeable Imports
-
-**Some large libraries support tree-shaking:**
-```javascript
-// ❌ Bad - imports entire library
-import _ from 'lodash'
-
-// ✅ Good - tree-shakeable
-import debounce from 'lodash-es/debounce'
-```
-
-## Anti-Patterns
-
-### ❌ Installing Without Version Check
+**Compare alternatives:**
 
 ```bash
-# Bad - might get old cached version
-npm install lodash
-
-# Good - explicit latest version
-npm install lodash@4.17.21
+for pkg in dayjs date-fns luxon; do
+  curl -s "https://bundlephobia.com/api/size?package=$pkg@latest" | jq --arg p "$pkg" '{pkg: $p, gzip}'
+done
 ```
 
-### ❌ Not Considering Bundle Size
+**Version, dates, deprecation:**
 
-Don't install `moment.js` (289 KB) when `dayjs` (2.9 KB) would work.
+```bash
+npm view <pkg> version
+npm view <pkg> time.modified
+npm view <pkg> deprecated
+npm view <pkg> dist-tags --json
+```
 
-### ❌ Not Checking Maintenance
+**Downloads (popularity):**
 
-Avoid deprecated or unmaintained packages:
-- `request` (deprecated, use `got` or `ky`)
-- `moment` (maintenance mode, use `dayjs` or `date-fns`)
+```bash
+curl -s "https://api.npmjs.org/downloads/point/last-week/<pkg>" | jq '.downloads'
+```
 
-### ❌ Adding Unnecessary Dependencies
+**Security:**
 
-Before adding a package, check if:
-- Native JavaScript can do it (e.g., `Date` API instead of date library for simple cases)
-- It's already in dependencies (check `package.json`)
-- A lighter alternative exists
+```bash
+npm audit                         # after install
+# or pre-install:
+npx npq install <pkg>             # sanity-checker
+```
+
+**Install (pinned):**
+
+```bash
+npm install <pkg>@<version>       # -D for dev
+pnpm add <pkg>@<version>          # -D for dev
+yarn add <pkg>@<version>          # -D for dev
+bun add <pkg>@<version>           # -d for dev
+```
+
+**Common categories:**
+
+| Need | Top options | Default pick |
+|---|---|---|
+| Date | dayjs, date-fns, luxon | dayjs (smallest) |
+| HTTP | axios, ky, undici, got | ky (modern) or axios (ecosystem) |
+| Validation | zod, valibot, yup | zod (TS-first) or valibot (smaller) |
+| Testing | vitest, jest, uvu | vitest |
+| State (React) | zustand, jotai, redux | zustand |
+| Forms (React) | react-hook-form, formik | react-hook-form |
+| UUID | uuid, nanoid | nanoid |
+| Icons (React) | lucide-react, react-icons | lucide-react |
+
+**Bundle thresholds (gzipped):**
+
+| Size | Action |
+|---|---|
+| < 5 KB | Safe |
+| 5–20 KB | Usually fine |
+| 20–50 KB | Consider alternatives |
+| 50–100 KB | Justify |
+| > 100 KB | Look for something lighter |
+
+### cargo (Rust)
+
+**Check the registry:**
+
+```bash
+cargo search <crate>
+cargo info <crate>                # cargo 1.76+
+```
+
+Otherwise: `https://crates.io/api/v1/crates/<crate>` returns JSON with downloads, versions, license, repository.
+
+**Version + metadata via crates.io API:**
+
+```bash
+curl -s "https://crates.io/api/v1/crates/<crate>" | jq '{
+  latest: .crate.max_stable_version,
+  downloads: .crate.downloads,
+  recent: .crate.recent_downloads,
+  updated: .crate.updated_at,
+  license: .versions[0].license
+}'
+```
+
+**Dep tree + size context:**
+
+```bash
+cargo tree -p <crate>             # transitive deps
+cargo bloat --release --crates    # after adding, if binary size matters
+```
+
+**Security:**
+
+```bash
+cargo install cargo-audit         # one-time
+cargo audit
+cargo install cargo-deny          # license + advisory policy
+cargo deny check
+```
+
+**Outdated / deprecated:**
+
+```bash
+cargo install cargo-outdated
+cargo outdated
+```
+
+**Install (pinned, via cargo add):**
+
+```bash
+cargo add <crate>@<version>
+cargo add <crate>@<version> --features "a,b"
+cargo add <crate>@<version> --dev
+```
+
+**Reference:** [lib.rs](https://lib.rs) is a better UX than crates.io for browsing; it surfaces maintenance signals and usage counts.
+
+### pip / uv (Python)
+
+**Prefer `uv` for speed and reproducibility.**
+
+**Version + metadata via PyPI JSON API:**
+
+```bash
+curl -s "https://pypi.org/pypi/<pkg>/json" | jq '{
+  latest: .info.version,
+  license: .info.license,
+  requires_python: .info.requires_python,
+  last_release: .releases | to_entries | max_by(.value[0].upload_time) | .key,
+  home: .info.home_page
+}'
+```
+
+**Install size + transitive deps:**
+
+```bash
+pip show <pkg>                    # after install
+pip show <pkg> | grep Requires
+# or without installing:
+pip install --dry-run <pkg> 2>&1 | head -30
+```
+
+**Security:**
+
+```bash
+pip install pip-audit             # one-time
+pip-audit
+
+pip install safety
+safety check
+```
+
+**Install (pinned):**
+
+```bash
+# pip
+pip install '<pkg>==<version>'
+
+# uv (preferred)
+uv add '<pkg>==<version>'
+uv add --dev '<pkg>==<version>'
+```
+
+### go modules
+
+**Metadata via pkg.go.dev (no JSON API — use the web page or proxy):**
+
+```bash
+# Resolve latest version
+go list -m -versions <module>
+# Module info
+curl -s "https://proxy.golang.org/<module>/@latest" | jq
+```
+
+**Security:**
+
+```bash
+go install golang.org/x/vuln/cmd/govulncheck@latest
+govulncheck ./...
+```
+
+**Transitive deps:**
+
+```bash
+go mod graph | grep <module>
+go list -m -u all                 # outdated
+```
+
+**Install (pinned):**
+
+```bash
+go get <module>@<version>
+go mod tidy
+```
+
+`go get` without `@version` pulls latest — always pin.
+
+### nuget (.NET)
+
+**Version + metadata via NuGet API:**
+
+```bash
+# Latest stable version
+curl -s "https://api.nuget.org/v3-flatcontainer/<package>/index.json" | jq '.versions | last'
+
+# Full metadata
+curl -s "https://api.nuget.org/v3/registration5-semver1/<package>/index.json" | jq
+```
+
+**Dep tree + vuln scan (via dotnet CLI):**
+
+```bash
+dotnet list package --include-transitive
+dotnet list package --vulnerable --include-transitive
+dotnet list package --deprecated
+dotnet list package --outdated
+```
+
+**Install (pinned):**
+
+```bash
+dotnet add package <Name> --version <ver>
+```
+
+For install *mechanics* (Central Package Management, version variables, workspaces), defer to the `nuget-package-management` skill.
+
+---
+
+## Anti-patterns (cross-ecosystem)
+
+**Installing without pinning the version.**
+Always install with an explicit version.
+
+**Skipping the footprint check because "it's probably small".**
+`moment` was 289 KB gzipped; the author thought it was small too. Check.
+
+**Treating transitive deps as free.**
+A 2 KB wrapper around a 200 KB tree is a 200 KB dep. `cargo tree`, `npm ls`, `pip show`, etc.
+
+**Picking the popular one reflexively.**
+Popular ≠ maintained. `moment` (maintenance mode) and `request` (deprecated) were once the default picks.
+
+**Adding a lib for one function.**
+A 6-line utility isn't worth a dep. Especially in TS/Rust where monomorphization + tree-shaking mean the cost shows up in build time anyway.
+
+---
 
 ## Examples
 
-### Example 1: Generic Request
+### npm: generic request
 
 **User:** "Add a date library"
 
-**Evaluation:**
 1. Alternatives: dayjs, date-fns, luxon
-2. Bundle sizes: dayjs (2.9 KB), date-fns (13 KB), luxon (25 KB)
-3. Latest: dayjs@1.11.10, date-fns@3.3.1, luxon@3.4.4
-4. All actively maintained
-5. Recommend: dayjs (smallest, good DX)
-6. Install: `npm install dayjs@1.11.10`
+2. Footprint (gzipped): dayjs 2.9 KB, date-fns 13 KB, luxon 25 KB
+3. All actively maintained
+4. Licenses all MIT
+5. Recommend: dayjs (smallest, good DX). `npm install dayjs@1.11.10`
 
-### Example 2: Specific Package
+### cargo: specific crate
 
-**User:** "Add axios"
+**User:** "Add tokio"
 
-**Evaluation:**
-1. Package: axios (requested), alternatives: ky, got
-2. Bundle: axios (13 KB), ky (4.8 KB), got (Node.js only)
-3. Latest: axios@1.6.7
-4. Very active, 50M+ downloads/week
-5. Recommend: axios (as requested, widely used)
-6. Install: `npm install axios@1.6.7`
+1. Need check: async runtime required for this server? yes.
+2. Metadata: crates.io API → latest 1.37.0, license MIT, updated this month, 100M+ downloads
+3. Feature footprint: `tokio = { version = "1.37", features = ["rt-multi-thread", "macros"] }` (avoid `full` — pulls everything).
+4. Security: `cargo audit` clean.
+5. Install: `cargo add tokio@1.37 --features rt-multi-thread,macros`
 
-### Example 3: Optimization Request
+### pip: bundle replacement
 
-**User:** "Our bundle is too large, what can we optimize?"
+**User:** "Our Python deploys are slow, image is 2GB"
 
-**Evaluation:**
-1. Check package.json for heavy dependencies
-2. Run bundlephobia on top packages
-3. Identify candidates: moment (289 KB) → dayjs (2.9 KB)
-4. Suggest: "Replace moment with dayjs, saves 286 KB"
-5. Migration guide if needed
+1. Check `pip list` + `pip show <pkg>` for largest installs
+2. Flag candidates: pandas (heavy), scipy (heavy)
+3. Suggest: if only using `read_csv`, consider `polars` (smaller, faster) or stdlib `csv`
+4. Measure after swap.
+
+### nuget: package with CPM
+
+**User:** "Add Serilog"
+
+1. Delegate install mechanics to `nuget-package-management` (CPM, shared version vars)
+2. Metadata: nuget.org → latest 4.0.0, license Apache-2.0, actively maintained
+3. Vuln scan: `dotnet list package --vulnerable` clean
+4. Install: use `dotnet add package Serilog` (CPM will pick the shared version)
+
+---
 
 ## References
 
-**External tools:**
-- [Bundlephobia](https://bundlephobia.com) - Bundle size checker
-- [npm trends](https://npmtrends.com) - Compare package popularity
-- [Snyk Advisor](https://snyk.io/advisor) - Package health scores
+- **npm:** [bundlephobia](https://bundlephobia.com), [npmtrends](https://npmtrends.com), [Snyk advisor](https://snyk.io/advisor)
+- **cargo:** [lib.rs](https://lib.rs), [crates.io](https://crates.io), [rustsec advisory DB](https://rustsec.org)
+- **python:** [pypi](https://pypi.org), [Snyk advisor](https://snyk.io/advisor/python)
+- **go:** [pkg.go.dev](https://pkg.go.dev), [osv.dev](https://osv.dev)
+- **nuget:** [nuget.org](https://nuget.org), [GitHub Advisory DB](https://github.com/advisories)
 
-**For package manager commands:** See [node-package-management skill](../node-package-management/SKILL.md)
+Related skills:
+- `nuget-package-management` — .NET install mechanics (CPM, version variables)
+- `node-package-management` — npm/pnpm install mechanics, workspaces

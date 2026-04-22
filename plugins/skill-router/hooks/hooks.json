@@ -1,0 +1,28 @@
+{
+  "description": "Injects skill-router meta-skill on SessionStart and emits JIT skill advisories on PreToolUse Bash.",
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/scripts/inject-meta-skill.sh",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/scripts/skill-advisor.sh",
+            "timeout": 5
+          }
+        ]
+      }
+    ]
+  }
+}
