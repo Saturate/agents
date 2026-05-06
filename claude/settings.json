@@ -212,19 +212,34 @@
       "mcp__azure-devops-belgium__advsec_get_alert_details"
     ],
     "deny": [
+      "Bash(rm -rf:*)",
       "Bash(git reset --hard:*)",
       "Bash(git clean -f:*)",
       "Bash(git push --force:*)",
       "Bash(git branch -D:*)"
     ],
     "ask": [
-      "Bash(git push:*)",
-      "Bash(rm -rf:*)"
+      "Bash(git push:*)"
     ]
   },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash /Users/alkj/code/github/agents/claude/hooks/safe-port-kill.sh"
+          }
+        ]
+      }
+    ]
+  },
+  "model": "claude-opus-4-6[1m]",
   "statusLine": {
     "type": "command",
-    "command": "$HOME/.claude/statusline-command.sh"
+    "command": "/Users/alkj/code/github/ccbar/target/release/ccbar",
+    "refreshInterval": 1
   },
   "enabledPlugins": {
     "frontend-design@claude-plugins-official": true,
@@ -242,5 +257,7 @@
       }
     }
   },
-  "skipDangerousModePermissionPrompt": true
+  "skipDangerousModePermissionPrompt": true,
+  "remoteControlAtStartup": true,
+  "agentPushNotifEnabled": true
 }

@@ -41,6 +41,10 @@ Key Principle: Comments should only explain WHY, not what or how - that's the co
 
 Use the `commit` skill for commit guidelines.
 
+# Shell
+
+- `grep` is aliased to `rg` (ripgrep). Don't use GNU grep flags like `-E` in bash pipes — use `rg` syntax or the dedicated Grep tool.
+
 # Clipboard
 
 Offer to copy to clipboard when it makes sense that I want to get content for use elsewhere.

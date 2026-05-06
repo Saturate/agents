@@ -259,11 +259,11 @@ fi
 # ── Separators ────────────────────────────────────────────────────
 SEP="${DIM} │ ${RST}"
 
-# ── Line 1: model + directory + git ──────────────────────────────
-line1="${model_segment}${SEP}${dir_display}${git_segment}"
+# ── Line 1: directory + git ───────────────────────────────────────
+line1="${dir_display}${git_segment}"
 
-# ── Line 2: context bar + tokens + cost + duration + rate limits ─
-line2="${ctx_segment}${SEP}${token_segment}${SEP}${cost_segment}"
+# ── Line 2: model + context bar + tokens + cost + duration + rate limits ─
+line2="${model_segment}${SEP}${ctx_segment}${SEP}${token_segment}${SEP}${cost_segment}"
 
 if [ -n "$duration_segment" ]; then
     line2="${line2}${SEP}${duration_segment}"
