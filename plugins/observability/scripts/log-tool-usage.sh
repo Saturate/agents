@@ -113,14 +113,11 @@ if [ "$EVENT" = "post" ]; then
   echo $((CURRENT + 1)) > "$TURN_TOOLS_FILE"
 fi
 
-log_entry "tool-usage" "$ENTRY"
-
-# Push to Loki
-push_loki "$(jq -cn \
+emit_event "tool-usage" "$ENTRY" "$(jq -cn \
   --arg source "claude-code" \
   --arg event "tool" \
   --arg tool_name "$TOOL_NAME" \
   --arg project "$PROJECT" \
-  '{source: $source, event: $event, tool_name: $tool_name, project: $project}')" "$ENTRY"
+  '{source: $source, event: $event, tool_name: $tool_name, project: $project}')"
 
 exit 0

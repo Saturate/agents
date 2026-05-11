@@ -21,13 +21,11 @@ ENTRY=$(jq -cn \
   --arg tool_name "$TOOL_NAME" \
   '{timestamp: $ts, event: $ev, session_id: $sid, project: $project, tool_name: $tool_name}')
 
-log_entry "permissions" "$ENTRY"
-
-push_loki "$(jq -cn \
+emit_event "permissions" "$ENTRY" "$(jq -cn \
   --arg source "claude-code" \
   --arg event "permission" \
   --arg tool_name "$TOOL_NAME" \
   --arg project "$PROJECT" \
-  '{source: $source, event: $event, tool_name: $tool_name, project: $project}')" "$ENTRY"
+  '{source: $source, event: $event, tool_name: $tool_name, project: $project}')"
 
 exit 0

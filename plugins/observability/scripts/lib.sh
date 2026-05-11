@@ -81,7 +81,7 @@ log_entry() {
 
 # ── Loki push ────────────────────────────────────────────────────────────────
 # push_loki <labels_json> <log_line>
-# Backgrounded curl, never blocks. Requires LOKI_USER + LOKI_PASS.
+# Synchronous — caller is responsible for backgrounding via emit_event.
 
 push_loki() {
   local labels="$1"
@@ -99,25 +99,39 @@ push_loki() {
     --arg line "$line" \
     '{streams: [{stream: $labels, values: [[$ts, $line]]}]}')
 
-  {
-    local response http_code
-    response=$(curl -s -w "\n%{http_code}" -u "$LOKI_USER:$LOKI_PASS" \
-      "$LOKI_URL" \
-      -H "Content-Type: application/json" \
-      -d "$payload" 2>&1)
-    http_code=$(echo "$response" | tail -1)
+  local response http_code
+  response=$(curl -s --connect-timeout 2 --max-time 5 \
+    -w "\n%{http_code}" -u "$LOKI_USER:$LOKI_PASS" \
+    "$LOKI_URL" \
+    -H "Content-Type: application/json" \
+    -d "$payload" 2>&1)
+  http_code=$(echo "$response" | tail -1)
 
-    if [ "$http_code" != "204" ] && [ "$http_code" != "200" ]; then
-      local body
-      body=$(echo "$response" | sed '$d' | head -1)
-      log_entry "loki-errors" "$(jq -cn \
-        --arg ts "$(utc_timestamp)" \
-        --argjson labels "$labels" \
-        --arg http_code "$http_code" \
-        --arg body "$body" \
-        '{timestamp: $ts, labels: $labels, http_code: $http_code, body: $body}')"
-    fi
+  if [ "$http_code" != "204" ] && [ "$http_code" != "200" ]; then
+    local body
+    body=$(echo "$response" | sed '$d' | head -1)
+    log_entry "loki-errors" "$(jq -cn \
+      --arg ts "$(utc_timestamp)" \
+      --argjson labels "$labels" \
+      --arg http_code "$http_code" \
+      --arg body "$body" \
+      '{timestamp: $ts, labels: $labels, http_code: $http_code, body: $body}')"
+  fi
+}
+
+# ── Emit event (non-blocking) ───────────────────────────────────────────────
+# emit_event <category> <json_entry> <loki_labels_json>
+# Writes local JSONL + pushes to Loki, all in a detached background job.
+
+emit_event() {
+  local category="$1"
+  local entry="$2"
+  local labels="$3"
+  {
+    log_entry "$category" "$entry"
+    push_loki "$labels" "$entry"
   } &
+  disown
 }
 
 # ── Model pricing ────────────────────────────────────────────────────────────

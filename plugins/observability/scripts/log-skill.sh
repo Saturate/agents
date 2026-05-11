@@ -21,13 +21,11 @@ ENTRY=$(jq -cn \
   --arg args "$SKILL_ARGS" \
   '{timestamp: $ts, event: $ev, session_id: $sid, project: $project, skill: $skill, args: $args}')
 
-log_entry "skills" "$ENTRY"
-
-push_loki "$(jq -cn \
+emit_event "skills" "$ENTRY" "$(jq -cn \
   --arg source "claude-code" \
   --arg event "skill_invoked" \
   --arg skill "$SKILL_NAME" \
   --arg project "$PROJECT" \
-  '{source: $source, event: $event, skill: $skill, project: $project}')" "$ENTRY"
+  '{source: $source, event: $event, skill: $skill, project: $project}')"
 
 exit 0

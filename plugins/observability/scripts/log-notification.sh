@@ -25,13 +25,11 @@ ENTRY=$(jq -cn \
   --arg message "$MESSAGE" \
   '{timestamp: $ts, event: $ev, session_id: $sid, project: $project, notification_type: $notification_type, title: $title, message: $message}')
 
-log_entry "notifications" "$ENTRY"
-
-push_loki "$(jq -cn \
+emit_event "notifications" "$ENTRY" "$(jq -cn \
   --arg source "claude-code" \
   --arg event "notification" \
   --arg notification_type "$NOTIFICATION_TYPE" \
   --arg project "$PROJECT" \
-  '{source: $source, event: $event, notification_type: $notification_type, project: $project}')" "$ENTRY"
+  '{source: $source, event: $event, notification_type: $notification_type, project: $project}')"
 
 exit 0

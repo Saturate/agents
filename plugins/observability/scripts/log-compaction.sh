@@ -19,12 +19,10 @@ ENTRY=$(jq -cn \
   --arg project "$PROJECT" \
   '{timestamp: $ts, event: $ev, session_id: $sid, project: $project}')
 
-log_entry "compactions" "$ENTRY"
-
-push_loki "$(jq -cn \
+emit_event "compactions" "$ENTRY" "$(jq -cn \
   --arg source "claude-code" \
   --arg event "compaction" \
   --arg project "$PROJECT" \
-  '{source: $source, event: $event, project: $project}')" "$ENTRY"
+  '{source: $source, event: $event, project: $project}')"
 
 exit 0

@@ -27,12 +27,10 @@ ENTRY=$(jq -cn \
   --arg branch "$BRANCH" \
   '{timestamp: $ts, event: $ev, session_id: $sid, project: $project, worktree_path: $worktree_path, branch: $branch}')
 
-log_entry "worktrees" "$ENTRY"
-
-push_loki "$(jq -cn \
+emit_event "worktrees" "$ENTRY" "$(jq -cn \
   --arg source "claude-code" \
   --arg event "$EVENT_TYPE" \
   --arg project "$PROJECT" \
-  '{source: $source, event: $event, project: $project}')" "$ENTRY"
+  '{source: $source, event: $event, project: $project}')"
 
 exit 0

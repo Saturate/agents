@@ -78,13 +78,11 @@ ENTRY=$(jq -cn \
   --arg stop_hook_active "$STOP_HOOK_ACTIVE" \
   '{timestamp: $ts, event: $ev, session_id: $sid, project: $project, git_branch: $git_branch, model: $model, turn_number: $turn_number, usage: $usage, estimated_cost_usd: $cost, tool_count: $tool_count, tool_failures: $tool_failures, stop_hook_active: $stop_hook_active}')
 
-log_entry "turns" "$ENTRY"
-
-push_loki "$(jq -cn \
+emit_event "turns" "$ENTRY" "$(jq -cn \
   --arg source "claude-code" \
   --arg event "turn" \
   --arg project "$PROJECT" \
   --arg model "$MODEL" \
-  '{source: $source, event: $event, project: $project, model: $model}')" "$ENTRY"
+  '{source: $source, event: $event, project: $project, model: $model}')"
 
 exit 0

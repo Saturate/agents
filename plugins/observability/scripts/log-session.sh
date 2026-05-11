@@ -34,14 +34,12 @@ case "$HOOK_EVENT" in
       --arg agent_type "$AGENT_TYPE" \
       '{timestamp: $ts, event: $ev, session_id: $sid, cwd: $cwd, project: $project, git_branch: $git_branch, model: $model, agent_type: $agent_type}')
 
-    log_entry "sessions" "$ENTRY"
-
-    push_loki "$(jq -cn \
+    emit_event "sessions" "$ENTRY" "$(jq -cn \
       --arg source "claude-code" \
       --arg event "session" \
       --arg project "$PROJECT" \
       --arg model "$MODEL" \
-      '{source: $source, event: $event, project: $project, model: $model}')" "$ENTRY"
+      '{source: $source, event: $event, project: $project, model: $model}')"
     ;;
 
   SessionEnd)
@@ -116,14 +114,12 @@ case "$HOOK_EVENT" in
       --argjson compaction_count "$COMPACTION_COUNT" \
       '{timestamp: $ts, event: $ev, session_id: $sid, cwd: $cwd, project: $project, git_branch: $git_branch, model: $model, reason: $reason, duration_s: $duration_s, usage: $usage, estimated_cost_usd: $cost, cache_hit_rate: $cache_hit_rate, turn_count: $turn_count, tool_count: $tool_count, compaction_count: $compaction_count}')
 
-    log_entry "sessions" "$ENTRY"
-
-    push_loki "$(jq -cn \
+    emit_event "sessions" "$ENTRY" "$(jq -cn \
       --arg source "claude-code" \
       --arg event "session" \
       --arg project "$PROJECT" \
       --arg model "$MODEL" \
-      '{source: $source, event: $event, project: $project, model: $model}')" "$ENTRY"
+      '{source: $source, event: $event, project: $project, model: $model}')"
 
     # Clean up turn counter files
     rm -f "$TIMING_DIR/turn-count-$SESSION_ID" "$TIMING_DIR/turn-tools-$SESSION_ID" "$TIMING_DIR/turn-failures-$SESSION_ID"

@@ -29,12 +29,10 @@ if [ -n "$EXTRA" ] && [ "$EXTRA" != "{}" ]; then
   ENTRY=$(echo "$ENTRY" | jq -c --argjson extra "$EXTRA" '. + {details: $extra}')
 fi
 
-log_entry "tasks" "$ENTRY"
-
-push_loki "$(jq -cn \
+emit_event "tasks" "$ENTRY" "$(jq -cn \
   --arg source "claude-code" \
   --arg event "$EVENT_TYPE" \
   --arg project "$PROJECT" \
-  '{source: $source, event: $event, project: $project}')" "$ENTRY"
+  '{source: $source, event: $event, project: $project}')"
 
 exit 0

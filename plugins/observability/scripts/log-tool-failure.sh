@@ -44,18 +44,16 @@ ENTRY=$(jq -cn \
   --argjson duration_ms "$DURATION_MS" \
   '{timestamp: $ts, event: $ev, session_id: $sid, tool_use_id: $tuid, tool_name: $tool, cwd: $cwd, project: $project, git_branch: $git_branch, error: $error, is_interrupt: $is_interrupt, duration_ms: $duration_ms}')
 
-log_entry "tool-usage" "$ENTRY"
-
-# Increment per-turn failure counter (read by log-turn.sh on Stop)
+# Increment per-turn failure counter (read by log-turn.sh on Stop) — must stay synchronous
 TURN_FAILURES_FILE="$TIMING_DIR/turn-failures-$SESSION_ID"
 CURRENT=$(cat "$TURN_FAILURES_FILE" 2>/dev/null || echo 0)
 echo $((CURRENT + 1)) > "$TURN_FAILURES_FILE"
 
-push_loki "$(jq -cn \
+emit_event "tool-usage" "$ENTRY" "$(jq -cn \
   --arg source "claude-code" \
   --arg event "tool_failure" \
   --arg tool_name "$TOOL_NAME" \
   --arg project "$PROJECT" \
-  '{source: $source, event: $event, tool_name: $tool_name, project: $project}')" "$ENTRY"
+  '{source: $source, event: $event, tool_name: $tool_name, project: $project}')"
 
 exit 0

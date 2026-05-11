@@ -27,13 +27,11 @@ case "$HOOK_EVENT" in
       --arg agent_type "$AGENT_TYPE" \
       '{timestamp: $ts, event: $ev, session_id: $sid, project: $project, agent_id: $agent_id, agent_type: $agent_type}')
 
-    log_entry "subagents" "$ENTRY"
-
-    push_loki "$(jq -cn \
+    emit_event "subagents" "$ENTRY" "$(jq -cn \
       --arg source "claude-code" \
       --arg event "subagent" \
       --arg project "$PROJECT" \
-      '{source: $source, event: $event, project: $project}')" "$ENTRY"
+      '{source: $source, event: $event, project: $project}')"
     ;;
 
   SubagentStop)
@@ -86,13 +84,11 @@ case "$HOOK_EVENT" in
       --argjson cost "$COST" \
       '{timestamp: $ts, event: $ev, session_id: $sid, project: $project, agent_id: $agent_id, agent_type: $agent_type, duration_ms: $duration_ms, usage: $usage, estimated_cost_usd: $cost}')
 
-    log_entry "subagents" "$ENTRY"
-
-    push_loki "$(jq -cn \
+    emit_event "subagents" "$ENTRY" "$(jq -cn \
       --arg source "claude-code" \
       --arg event "subagent" \
       --arg project "$PROJECT" \
-      '{source: $source, event: $event, project: $project}')" "$ENTRY"
+      '{source: $source, event: $event, project: $project}')"
     ;;
 
   *) exit 0 ;;

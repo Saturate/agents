@@ -30,12 +30,10 @@ ENTRY=$(jq -cn \
   --arg skill "$SKILL_NAME" \
   '{timestamp: $ts, event: $ev, session_id: $sid, project: $project, prompt: $prompt, length_chars: $length_chars} + (if $skill != "" then {skill: $skill} else {} end)')
 
-log_entry "prompts" "$ENTRY"
-
-push_loki "$(jq -cn \
+emit_event "prompts" "$ENTRY" "$(jq -cn \
   --arg source "claude-code" \
   --arg event "prompt" \
   --arg project "$PROJECT" \
-  '{source: $source, event: $event, project: $project}')" "$ENTRY"
+  '{source: $source, event: $event, project: $project}')"
 
 exit 0

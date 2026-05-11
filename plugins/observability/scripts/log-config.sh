@@ -21,12 +21,10 @@ ENTRY=$(jq -cn \
   --arg config_source "$CONFIG_SOURCE" \
   '{timestamp: $ts, event: $ev, session_id: $sid, project: $project, config_source: $config_source}')
 
-log_entry "config-changes" "$ENTRY"
-
-push_loki "$(jq -cn \
+emit_event "config-changes" "$ENTRY" "$(jq -cn \
   --arg source "claude-code" \
   --arg event "config_change" \
   --arg project "$PROJECT" \
-  '{source: $source, event: $event, project: $project}')" "$ENTRY"
+  '{source: $source, event: $event, project: $project}')"
 
 exit 0
