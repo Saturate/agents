@@ -47,6 +47,7 @@ Task arrives
         ├── Opening a PR ────────────────────→ make-pr
         ├── Port conflict / starting dev ────→ managing-ports
         ├── Cloning an Azure DevOps project ─→ azure-init
+        ├── Recursive file deletion ──────────→ safe-delete
         ├── Browser automation / scraping ───→ chrome-devtools
         └── Authoring a new skill ───────────→ validate-skill
 ```
@@ -117,6 +118,7 @@ A task isn't done until there's evidence — passing tests, build output, runtim
 | Action | managing-ports | Detect framework, start dev server |
 | Action | azure-init | Clone all Azure DevOps project repos |
 | Action | chrome-devtools | Browser automation via MCP |
+| Action | safe-delete | Backup-first recursive deletion |
 | Action | validate-skill | Validate a new skill's quality |
 
 ## Failure modes
