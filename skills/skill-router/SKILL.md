@@ -35,6 +35,7 @@ Task arrives
   ├── Whole-codebase audit ───────────────────→ codebase-audit
   ├── Measuring code (LOC, complexity, dup) ──→ code-metrics
   │
+  ├── Writing prose (blog, article, docs) ────→ no-ai-slop
   ├── Writing an ADR / architecture doc ──────→ documentation-adrs
   │
   ├── Pre-launch / deploy readiness ──────────→ launch-checklist
@@ -109,6 +110,7 @@ A task isn't done until there's evidence — passing tests, build output, runtim
 | Review | codebase-audit | Whole-repo health |
 | Review | code-metrics | LOC, complexity, dup signals |
 | Review | documentation-adrs | Decision records |
+| Write | no-ai-slop | Anti-slop prose writing |
 | Ship | launch-checklist | Deploy readiness |
 | Ship | commit | Commit message style |
 | Ship | make-pr | Open PR with context-aware description |
