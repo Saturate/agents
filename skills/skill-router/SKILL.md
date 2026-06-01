@@ -45,6 +45,7 @@ Task arrives
         │     ├── npm/pnpm/yarn/bun ─────────→ + node-package-management
         │     └── nuget / dotnet add ────────→ + nuget-package-management
         ├── Committing ──────────────────────→ commit
+        ├── Pushing ─────────────────────────→ push
         ├── Opening a PR ────────────────────→ make-pr
         ├── Port conflict / starting dev ────→ managing-ports
         ├── Cloning an Azure DevOps project ─→ azure-init
@@ -56,7 +57,7 @@ Task arrives
 ## Rules
 
 1. **Check the router before starting non-trivial work.** Vague prompts default to `idea-refine`. "Build X" without a spec defaults to `pre-planning` first.
-2. **Workflow skills are chainable.** A typical feature: `pre-planning` → `incremental-implementation` → `tdd` → `pr-review` → `make-pr`.
+2. **Workflow skills are chainable.** A typical feature: `pre-planning` → `incremental-implementation` → `tdd` → `pr-review` → `push` → `make-pr`.
 3. **Action skills gate specific tool calls.** Installing a package? `evaluating-dependencies` first. Committing? `commit`. Opening a PR? `make-pr`. These are enforced by the `skill-router` plugin's PreToolUse advisor where it applies — but consult them regardless.
 4. **Skills are not suggestions.** When a skill applies, follow its steps in order. Skipping the verification step of a workflow skill is the same as not running it.
 5. **When multiple apply, run them in sequence.** Example: a UI feature → `pre-planning` → `frontend-ui-engineering` → `incremental-implementation` → `tdd` → `pr-review`.
@@ -113,6 +114,7 @@ A task isn't done until there's evidence — passing tests, build output, runtim
 | Write | no-ai-slop | Anti-slop prose writing |
 | Ship | launch-checklist | Deploy readiness |
 | Ship | commit | Commit message style |
+| Ship | push | Run quality gates before pushing |
 | Ship | make-pr | Open PR with context-aware description |
 | Action | evaluating-dependencies | Evaluate before install (polyglot) |
 | Action | node-package-management | npm/pnpm/yarn/bun install mechanics |
