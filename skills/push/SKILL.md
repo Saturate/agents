@@ -9,7 +9,7 @@ metadata:
 
 # Push
 
-Run all detected project quality gates before pushing. If auto-fixable issues are found (formatting, linting), fix them and amend the last commit. If non-fixable issues are found (test failures, type errors), stop and report.
+Run all detected project quality gates before pushing. Fix issues found at each gate: auto-fix formatting and linting, then fix type errors, test failures, and build errors. Amend all fixes into the last commit to keep history clean.
 
 ## Progress checklist
 
@@ -125,7 +125,7 @@ Track whether any files were modified. If yes, flag for amend in Step 3.
 
 **Phase 2: Verification (typecheck, test, build)**
 
-These are pass/fail. Run them in order; stop on first failure.
+Run in order. On failure, attempt to fix before giving up.
 
 ```bash
 # Typecheck
@@ -139,23 +139,29 @@ pnpm run build
 ```
 
 If any fail:
-1. Report the failure clearly (include the error output)
-2. Do NOT push
-3. Do NOT amend
-4. Ask the user how to proceed
+1. Read the error output and identify the root cause
+2. Fix the issue in the source code
+3. Re-run the failing gate to verify the fix
+4. If the fix introduces new failures in other gates, re-run all gates from the start
+5. After a successful fix, stage changes and amend the last commit (same as Phase 1 fixes)
+6. If you are stuck and making no progress, stop, report what failed and what you tried, and ask the user how to proceed
 
-## Step 3: Amend if auto-fix changed files
+## Step 3: Amend if any gate changed files
 
-If Phase 1 modified files and Phase 2 passed:
+After all gates pass, check if any files were modified (formatter fixes, lint fixes, type error fixes, test fixes):
+
+```bash
+git diff --stat
+```
+
+If files changed:
 
 ```bash
 git add -A
 git commit --amend --no-edit
 ```
 
-This keeps the auto-fix changes in the existing commit instead of creating a "fix lint" commit.
-
-If Phase 1 modified files but Phase 2 failed: do NOT amend. The user needs to fix the Phase 2 failure first, and may want to see what the formatter changed separately.
+This keeps all gate-related fixes in the existing commit instead of creating "fix lint" or "fix types" commits.
 
 ## Step 4: Push
 
