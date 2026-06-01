@@ -159,8 +159,12 @@ absolutely, actually, basically, certainly, clearly, definitely, essentially, ex
 | "Why [Action] [Dramatic Verb]" | "Why Rebuilding Destroys Everything" | "How Forced Rebuilds Overwrite Parity on Degraded Arrays" |
 | "[Noun]: The [Adjective] [Noun]" | "Encryption: The Hidden Trap" | "Hardware AES-256 Encryption on WD Passport Bridge Boards" |
 | "The [Noun] You [Emotion Verb]" | "The Risk You Overlook" | "Unmonitored SMART Threshold Warnings" |
+| "What I [verb]" / "What [happened]" | "What I built", "What changed" | "Architecture", "Results" |
+| "How I [dramatic verb] [object]" | "How I tamed AI coding" | "Guardrail system for Claude Code" |
 
-Self-check: Could this heading be a thriller chapter title or YouTube clickbait? If yes, rewrite. A heading reads like a technical manual index entry.
+Headings name content, not narrative role. "What I built" tells you nothing about the section; "Architecture" does. "How I stopped X from doing Y" is a blog-title framing, not a section heading.
+
+Self-check: Could this heading be a thriller chapter title or YouTube clickbait? If yes, rewrite. Does the heading describe the section's *role* instead of its *content*? If yes, rewrite. A heading reads like a technical manual index entry.
 
 ## Academic-Specific AI Tells
 

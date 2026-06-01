@@ -40,6 +40,7 @@ Sources for deeper analysis or self-update: [references/sources.md](references/s
 - **No emoji as structure.** No emoji prefixes on bullet points, no emoji section markers. Emoji is ornament, not formatting.
 - **Spread zingers thin.** "You can't patch architecture." If someone would quote it on LinkedIn, you can keep one. Cut the rest.
 - **No parenthetical clarifications in headings.** Trust the reader.
+- **No narrative-role headings.** "What I built", "What changed", "How I did X" name the section's role, not its content. Use "Architecture", "Results", etc.
 
 ## Integrity rules
 
