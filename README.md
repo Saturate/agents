@@ -7,7 +7,7 @@ Skills, plugins, and configuration for AI coding agents. Works with Claude Code,
 ```
 skills/              Shared agent skills (tool-agnostic markdown)
 skills/_shared/      References shared across multiple skills
-plugins/             Plugins (observability, logging)
+plugins/             Plugins (observability, skill-router)
 claude/              Claude Code config (CLAUDE.md, settings, statusline)
 opencode/            OpenCode config (commands, agents)
 install.sh           Symlinks config for one or both tools
@@ -33,7 +33,7 @@ Skills are also available as a Claude Code plugin:
 /plugin marketplace add Saturate/agents
 ```
 
-The observability plugin (hook logging with optional Loki/Grafana push) can be installed separately:
+The [observability plugin](plugins/observability/) (hook logging with optional Loki/Grafana push) can be installed separately:
 
 ```
 /plugin install observability@Saturate-agents
