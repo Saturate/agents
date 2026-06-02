@@ -7,7 +7,6 @@ Tracks every Claude Code hook event to daily-rotated JSONL files in `~/.claude/l
 Via the Claude Code plugin marketplace:
 
 ```
-/plugin marketplace add Saturate/agents
 /plugin install observability@Saturate-agents
 ```
 
