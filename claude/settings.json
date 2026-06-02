@@ -100,6 +100,8 @@
       "Bash(go env:*)",
       "Bash(go doc:*)",
       "Bash(cargo build:*)",
+      "Bash(git push:*)",
+      "Bash(SKILL_ACK=push*)",
       "Bash(ls:*)",
       "Bash(mkdir:*)",
       "Bash(xargs:*)",
@@ -218,7 +220,6 @@
       "Bash(git branch -D:*)"
     ],
     "ask": [
-      "Bash(git push:*)",
       "Bash(rm -rf:*)"
     ]
   },
