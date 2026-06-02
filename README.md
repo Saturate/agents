@@ -37,6 +37,7 @@ The observability plugin (hook logging with optional Loki/Grafana push) can be i
 
 ```
 /plugin install observability@Saturate-agents
+/plugin install skill-router@Saturate-agents
 ```
 
 ## Skills
