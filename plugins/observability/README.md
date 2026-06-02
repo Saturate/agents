@@ -7,6 +7,7 @@ Tracks every Claude Code hook event to daily-rotated JSONL files in `~/.claude/l
 Via the Claude Code plugin marketplace:
 
 ```
+/plugin marketplace add Saturate/agents
 /plugin install observability@Saturate-agents
 ```
 
@@ -27,6 +28,12 @@ Or via the repo install script:
 | `UserPromptSubmit` | `prompts-YYYY-MM-DD.jsonl` | Prompt text, length |
 | `SubagentStart` / `SubagentStop` | `subagents-YYYY-MM-DD.jsonl` | Agent type, duration, tokens |
 | `PreCompact` | `compactions-YYYY-MM-DD.jsonl` | Session, context size |
+| `PostCompact` | `compactions-YYYY-MM-DD.jsonl` | Session, post-compaction state |
+| `StopFailure` | `turns-YYYY-MM-DD.jsonl` | API errors that killed a turn |
+| `PostToolBatch` | `tool-usage-YYYY-MM-DD.jsonl` | Parallel tool call batch results |
+| `PermissionDenied` | `permissions-YYYY-MM-DD.jsonl` | Tool, denied reason |
+| `TaskCreated` | `tasks-YYYY-MM-DD.jsonl` | Task creation details |
+| `InstructionsLoaded` | `configs-YYYY-MM-DD.jsonl` | CLAUDE.md/rules file loaded |
 | `Notification` | `notifications-YYYY-MM-DD.jsonl` | Notification content |
 | `PermissionRequest` | `permissions-YYYY-MM-DD.jsonl` | Tool, path, decision |
 | `ConfigChange` | `configs-YYYY-MM-DD.jsonl` | Changed config key/value |
