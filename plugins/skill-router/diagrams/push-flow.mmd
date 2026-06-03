@@ -1,0 +1,23 @@
+flowchart TD
+    subgraph flow["push workflow"]
+        direction TB
+        S1["Step 0: Safety checks"]
+        S2["Step 1: Detect project gates"]
+        S1 --> S2
+        S3["Step 2: Run gates"]
+        S2 --> S3
+        S4["Step 2b: Self-review (if substantial changes)"]
+        S3 --> S4
+        S4 -->|"findings"| FIX4["Fix + re-review"]
+        FIX4 -->|"loop"| S4
+        S5["Step 3: Amend if needed"]
+        S4 --> S5
+        S6["Step 4: Push"]
+        S5 --> S6
+
+        INV_code-review("/code-review"):::invoke
+    end
+
+    style flow fill:#1e1e2e,stroke:#89b4fa,color:#cdd6f4
+    classDef invoke fill:#302040,stroke:#cba6f7,color:#cdd6f4
+

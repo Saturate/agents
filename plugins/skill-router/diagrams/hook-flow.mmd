@@ -1,0 +1,60 @@
+%% Auto-generated from advisor-rules.conf — do not edit by hand
+%% Regenerate: bash plugins/skill-router/scripts/generate-diagrams.sh
+flowchart TB
+    subgraph hook["PreToolUse Hook · skill-advisor.sh"]
+        direction TB
+        CMD[/"Bash command"/]
+        NORM["Split on && and ;"]
+        ACK{"SKILL_ACK\npresent?"}
+        STRIP["Strip ACK'd segments\nkeep the rest"]
+        EMPTY{"Segments\nremaining?"}
+        MATCH{"Match rules\n(first hit wins)"}
+
+        CMD --> NORM --> ACK
+        ACK -->|"Some"| STRIP --> EMPTY
+        ACK -->|"No"| MATCH
+        EMPTY -->|"None"| PASS1(("Pass"))
+        EMPTY -->|"Yes"| MATCH
+    end
+
+    GATE["GATE\nBlock + custom message"]
+    BLOCK["BLOCK\nBlock + skill nudge"]
+    PASS2(("Pass"))
+
+    MATCH -->|"gate"| GATE
+    MATCH -->|"block"| BLOCK
+    MATCH -->|"no match"| PASS2
+
+    subgraph gates["Gate Rules · 7 rules"]
+        G1["draft-first\n^\sgh\s+issue\s+create"]
+        G2["draft-first\n^\sgh\s+pr\s+review"]
+        G3["draft-first\n^\sgh\s+pr\s+comment"]
+        G4["draft-first\n^\saz\s+repos\s+pr\s+create\s+-+thread"]
+        G5["confirm-destructive\n^\sgit\s+push\s+.*(-f|--force)"]
+        G6["confirm-destructive\n^\sgit\s+reset\s+--hard"]
+        G7["confirm-external\n^\sgh\s+repo\s+fork"]
+    end
+
+    subgraph blocks["Block Rules · 10 rules"]
+        B1["/evaluating-dependencies\n^\s(npm|pnpm|yarn|bun)\s+(install|add|i)"]
+        B2["/evaluating-dependencies\n^\scargo\s+add\s+[^-[:space:]]"]
+        B3["/evaluating-dependencies\n^\s(pip|pip3|uv)\s+(install|add)\s+[^-[:"]
+        B4["/evaluating-dependencies\n^\sgo\s+get\s+[^[:space:]]+@"]
+        B5["/evaluating-dependencies,nuget-package-management\n^\sdotnet\s+add\s+package\s+[^-[:space:]"]
+        B6["/commit\n^\sgit\s+commit"]
+        B7["/make-pr\n^\sgh\s+pr\s+create"]
+        B8["/make-pr\n^\saz\s+repos\s+pr\s+create"]
+        B9["/push\n^\sgit\s+push"]
+        B10["/safe-delete\n^\srm\s+(-[a-z]+\s+)*(--recursive|-[a-z]"]
+    end
+
+    GATE -.-> gates
+    BLOCK -.-> blocks
+
+    style hook fill:#1e1e2e,stroke:#89b4fa,color:#cdd6f4
+    style GATE fill:#f38ba8,stroke:#f38ba8,color:#1e1e2e
+    style BLOCK fill:#fab387,stroke:#fab387,color:#1e1e2e
+    style PASS1 fill:#a6e3a1,stroke:#a6e3a1,color:#1e1e2e
+    style PASS2 fill:#a6e3a1,stroke:#a6e3a1,color:#1e1e2e
+    style gates fill:#302040,stroke:#cba6f7,color:#cdd6f4
+    style blocks fill:#1e2030,stroke:#89b4fa,color:#cdd6f4

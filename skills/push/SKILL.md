@@ -18,6 +18,7 @@ Push skill progress:
 - [ ] Step 0: Safety checks
 - [ ] Step 1: Detect project gates
 - [ ] Step 2: Run gates
+- [ ] Step 2b: Self-review (if substantial changes)
 - [ ] Step 3: Amend if needed
 - [ ] Step 4: Push
 ```
@@ -145,6 +146,26 @@ If any fail:
 4. If the fix introduces new failures in other gates, re-run all gates from the start
 5. After a successful fix, stage changes and amend the last commit (same as Phase 1 fixes)
 6. If you are stuck and making no progress, stop, report what failed and what you tried, and ask the user how to proceed
+
+## Step 2b: Self-review
+
+After gates pass, decide whether a self-review is warranted. Check the diff scope:
+
+```bash
+git diff --stat $(git merge-base HEAD main)..HEAD
+```
+
+**Run the `code-review` skill when:**
+- More than 3 files changed with code modifications (not just config/docs)
+- Any security-sensitive paths touched (auth, payments, crypto, user data)
+- Multiple commits on the branch (feature work, not a quick fix)
+
+**Skip the review when:**
+- Only docs, config, or CI files changed (`.md`, `.yml`, `.json`, `.toml`)
+- Single-commit, single-file fix (typo, version bump, one-liner)
+- The user explicitly said to skip (`--no-review`)
+
+If a review is warranted, invoke `/code-review`. Fix any Critical or Important findings, then re-run `/code-review` to verify the fixes didn't introduce new issues. Repeat until clean. Amend all fixes along with any gate fixes in Step 3.
 
 ## Step 3: Amend if any gate changed files
 
