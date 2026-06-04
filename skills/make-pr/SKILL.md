@@ -20,7 +20,8 @@ PR Creation Progress:
 - [ ] Step 1: Parsed user arguments
 - [ ] Step 2: Got current state (branch, remote, target branch)
 - [ ] Step 3: Analyzed commits (found commits to PR)
-- [ ] Step 3b: Checked for PR template
+- [ ] Step 3b: Checked for PR template and CONTRIBUTING.md
+- [ ] Step 3c: Self-review
 - [ ] Step 4: Generated PR title and description
 - [ ] Step 5: Confirmed PR content with user
 - [ ] Step 6: Created PR successfully
@@ -229,9 +230,44 @@ If a template is found:
 
 If no template is found, use the default format from the description guide.
 
+**Check for CONTRIBUTING.md:**
+
+```bash
+# Check common locations
+cat CONTRIBUTING.md 2>/dev/null ||
+cat .github/CONTRIBUTING.md 2>/dev/null ||
+cat docs/CONTRIBUTING.md 2>/dev/null
+```
+
+If found, scan it for PR-relevant guidelines:
+- Required PR title format or naming conventions
+- Required sections or checklists in PR descriptions
+- Reviewer assignment rules or team conventions
+- Branch naming expectations
+- Linked issue or work item requirements
+- Any "do not" rules for PRs
+
+Apply these guidelines alongside (not instead of) any PR template found above. If CONTRIBUTING.md and the PR template conflict, the PR template wins for structure, but CONTRIBUTING.md wins for process rules (reviewers, labels, linked issues).
+
+## Step 3c: Self-review
+
+Before generating the PR description, review the changes that will be in the PR. This catches issues before they reach reviewers, and review findings can inform the PR description (risk areas to call out).
+
+```bash
+git diff --stat $target_branch...$current_branch
+```
+
+**Always run `/code-review` unless:**
+- The PR is docs-only (all changed files are `.md`, `.txt`, `.rst`)
+- The user passed `--no-review`
+
+Fix any Critical findings before proceeding. For Important findings, either fix them or note them as known issues in the PR description. Amend fixes into the relevant commits.
+
+After fixing, re-run `/code-review` to verify the fixes are clean and didn't introduce new issues. Repeat until no Critical findings remain. Then re-run the diff analysis from Step 3 to update the commit information.
+
 ## Step 4: Generate PR Title and Description
 
-If the user didn't provide `--title` or `--description`, generate them following the repo's PR template (if found in Step 3b) or the [PR Description Guide](references/pr-description-guide.md).
+If the user didn't provide `--title` or `--description`, generate them following the repo's CONTRIBUTING.md guidelines (if found), the repo's PR template (if found in Step 3b), or the [PR Description Guide](references/pr-description-guide.md).
 
 ### Title Generation (if not provided)
 
@@ -395,7 +431,7 @@ Display:
 - Reviewers (if added)
 - Labels/Work items (if added)
 
-Then suggest: "Want me to review the changes before you share this with the team?" If yes, try to invoke the `pr-review` skill with the PR URL. If that skill isn't available, do a quick inline review of the diff yourself (bugs, security, missing error handling).
+The code was already reviewed in Step 3c, so no post-creation review is needed.
 
 ## Error Handling Reference
 

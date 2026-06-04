@@ -47,6 +47,17 @@
         ]
       }
     ],
+    "PostToolBatch": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/scripts/log-tool-batch.sh",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
     "SessionStart": [
       {
         "hooks": [
@@ -75,6 +86,17 @@
           {
             "type": "command",
             "command": "${CLAUDE_PLUGIN_ROOT}/scripts/log-turn.sh",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "StopFailure": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/scripts/log-stop-failure.sh",
             "timeout": 10
           }
         ]
@@ -124,6 +146,17 @@
         ]
       }
     ],
+    "PostCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/scripts/log-post-compaction.sh",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
     "Notification": [
       {
         "hooks": [
@@ -141,6 +174,17 @@
           {
             "type": "command",
             "command": "${CLAUDE_PLUGIN_ROOT}/scripts/log-permission.sh",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PermissionDenied": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/scripts/log-permission-denied.sh",
             "timeout": 10
           }
         ]
@@ -179,6 +223,17 @@
         ]
       }
     ],
+    "TaskCreated": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/scripts/log-task.sh",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
     "TaskCompleted": [
       {
         "hooks": [
@@ -196,6 +251,17 @@
           {
             "type": "command",
             "command": "${CLAUDE_PLUGIN_ROOT}/scripts/log-task.sh",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "InstructionsLoaded": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/scripts/log-instructions.sh",
             "timeout": 10
           }
         ]

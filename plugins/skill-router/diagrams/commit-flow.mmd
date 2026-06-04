@@ -1,0 +1,19 @@
+flowchart TD
+    subgraph flow["commit workflow"]
+        direction TB
+        S1["Read the diff (staged changes only)"]
+        S2["Detect project commit conventions"]
+        S1 --> S2
+        S3["Auto-detect scope from changed files"]
+        S2 --> S3
+        S4["Scan diff for secrets"]
+        S3 --> S4
+        S5["Link work items if detectable"]
+        S4 --> S5
+        S6["Write message and commit"]
+        S5 --> S6
+    end
+
+    style flow fill:#1e1e2e,stroke:#89b4fa,color:#cdd6f4
+    classDef invoke fill:#302040,stroke:#cba6f7,color:#cdd6f4
+
