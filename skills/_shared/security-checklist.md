@@ -56,3 +56,22 @@ Shared reference for security-aware reviews across all skill levels.
 | `redirect(req.query.url)` | Open redirect | Allowlist redirect targets |
 | `path.join(base, userInput)` without validation | Path traversal | Validate, reject `..` |
 | Deserializing untrusted data (pickle, BinaryFormatter) | RCE | Use safe serializers (JSON) |
+
+## LLM / GenAI Integration
+
+When the codebase integrates LLMs (OpenAI, Anthropic, LangChain, Semantic Kernel, etc.):
+
+- User input separated from system instructions (use distinct message roles, not string concatenation)
+- LLM output treated as untrusted: sanitize before rendering as HTML, building SQL, or passing to shell
+- No `eval()`, `exec()`, or `Function()` on LLM-generated content
+- No secrets, API keys, or internal URLs in system prompts
+- Tool/function calling scoped to least privilege (read-only where possible, specific tables/resources)
+- Destructive tool actions (delete, send, publish, pay) require human approval
+- Rate limiting and token budgets (`max_tokens`) on all LLM-calling endpoints
+- Timeouts on LLM API calls
+- Per-user or per-tenant usage tracking
+- Vector store queries filtered by tenant/user (no cross-tenant data leakage)
+- User-uploaded documents validated before embedding into vector stores
+- PII redacted before sending to LLM
+
+See `owasp-llm-top-10.md` for the full OWASP LLM Top 10 reference with detection patterns and code examples.
