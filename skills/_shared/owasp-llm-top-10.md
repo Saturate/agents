@@ -30,7 +30,7 @@ Before applying these checks, confirm the project uses LLM APIs:
 # SDK imports
 rg -l "from openai|import openai|require.*openai|@azure/openai" --type-add 'code:*.{ts,js,py,cs,go}' -t code
 rg -l "from anthropic|import anthropic|require.*anthropic|@anthropic-ai" --type-add 'code:*.{ts,js,py,cs,go}' -t code
-rg -l "langchain|llama_index|llamaindex|@ai-sdk|semantic.kernel|Microsoft.SemanticKernel" --type-add 'code:*.{ts,js,py,cs,go}' -t code
+rg -l "langchain|llama_index|llamaindex|@ai-sdk|semantic[.-]kernel|Microsoft\.SemanticKernel" --type-add 'code:*.{ts,js,py,cs,go}' -t code
 
 # Direct API calls
 rg -l "api\.openai\.com|api\.anthropic\.com|generativelanguage\.googleapis" --type-add 'code:*.{ts,js,py,cs,go}' -t code
@@ -594,10 +594,10 @@ rg -n "run_sql|execute_command|fetch_url|shell" --type-add 'code:*.{ts,js,py,cs,
 rg -n "system.*content.*key|system.*content.*password|system.*content.*secret" --type-add 'code:*.{ts,js,py,cs,go}' -t code
 
 # Missing rate limits on LLM routes
-rg -n "app\.\(post\|get\).*chat\|app\.\(post\|get\).*completion\|app\.\(post\|get\).*generate" --type-add 'code:*.{ts,js,py}' -t code
+rg -n "app\.(post|get).*(chat|completion|generate)" --type-add 'code:*.{ts,js,py}' -t code
 
 # Missing max_tokens
-rg -n "completions\.create\|messages\.create\|generate_content" --type-add 'code:*.{ts,js,py}' -t code | rg -v "max_tokens\|maxTokens\|max_output_tokens"
+rg -n "(completions\.create|messages\.create|generate_content)" --type-add 'code:*.{ts,js,py}' -t code | rg -v "(max_tokens|maxTokens|max_output_tokens)"
 ```
 
 ## Severity Levels

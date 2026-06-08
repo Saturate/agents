@@ -74,7 +74,7 @@ Look for:
 Check if the codebase integrates LLMs:
 
 ```bash
-rg -l "openai|anthropic|langchain|@ai-sdk|ChatCompletion|messages\.create|semantic.kernel|GenerateContent" --type-add 'code:*.{ts,js,py,cs,go}' -t code
+rg -l "openai|anthropic|langchain|@ai-sdk|ChatCompletion|messages\.create|semantic[.-]kernel|Microsoft\.SemanticKernel|GenerateContent" --type-add 'code:*.{ts,js,py,cs,go}' -t code
 ```
 
 If matches found, load `../_shared/owasp-llm-top-10.md` and check:
