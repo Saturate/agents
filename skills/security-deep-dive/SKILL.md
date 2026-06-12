@@ -4,7 +4,7 @@ description: Performs red team security analysis with threat modeling, attack su
 allowed-tools: Read Grep Glob Bash WebSearch
 metadata:
   author: Saturate
-  version: "1.0"
+  version: "1.1"
 ---
 
 # Security Deep Dive
@@ -16,6 +16,7 @@ Think like an attacker. What would you try to break?
 - [ ] Define scope and threat model
 - [ ] Map the attack surface
 - [ ] Analyze auth flows
+- [ ] Audit LLM/GenAI threat surface (if applicable)
 - [ ] Audit dependency chain
 - [ ] Review infrastructure config
 - [ ] Attempt exploitation paths
@@ -67,6 +68,26 @@ Look for:
 - Authorization checks that only check authentication ("is logged in" but not "can access this resource")
 - IDOR vulnerabilities (can user A access user B's data by changing an ID?)
 - Token handling issues (stored in localStorage? No expiry? No rotation?)
+
+## Step 2b: LLM/GenAI Threat Surface
+
+Check if the codebase integrates LLMs:
+
+```bash
+rg -l "openai|anthropic|langchain|@ai-sdk|ChatCompletion|messages\.create|semantic[.-]kernel|Microsoft\.SemanticKernel|GenerateContent" --type-add 'code:*.{ts,js,py,cs,go}' -t code
+```
+
+If matches found, load `../_shared/owasp-llm-top-10.md` and check:
+
+1. **Prompt construction** - How are prompts built? Is user input concatenated directly, or separated into distinct message roles?
+2. **Output consumption** - Where does LLM output go? Is it rendered as HTML, used in SQL, passed to eval/exec, or used in file paths?
+3. **Tool/function calling** - What tools does the LLM have access to? Can it execute shell commands, run arbitrary SQL, or fetch arbitrary URLs?
+4. **RAG pipeline** - Is there a vector store? Are queries filtered by tenant? Can users inject content into the knowledge base?
+5. **System prompts** - Do they contain secrets, internal URLs, or security-sensitive logic?
+6. **Rate limiting** - Are LLM endpoints rate-limited? Are there token budgets and timeouts?
+7. **Human-in-the-loop** - Do destructive actions triggered by the LLM require user approval?
+
+For each finding, assess against the OWASP LLM Top 10 severity levels.
 
 ## Step 3: Dependency Chain Audit
 
@@ -137,4 +158,4 @@ For each finding:
 4. Recommended fix
 5. Severity with justification
 
-See `../_shared/security-checklist.md` for the detailed checklist and `../codebase-audit/references/owasp-top-10.md` for OWASP patterns.
+See `../_shared/security-checklist.md` for the detailed checklist, `../codebase-audit/references/owasp-top-10.md` for OWASP patterns, and `../_shared/owasp-llm-top-10.md` for LLM-specific risks.

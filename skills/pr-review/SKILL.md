@@ -134,6 +134,7 @@ From the changed file list, detect the tech stack and load **only** the relevant
 | `*.ts`, `*.tsx`, `*.js`, `*.jsx`, `*.vue`, `*.svelte` | [references/issues-typescript.md](references/issues-typescript.md) |
 | `*.cs`, `*.csproj`, `*.sln`, `*.razor` | [references/issues-dotnet.md](references/issues-dotnet.md) |
 | `*.go`, `go.mod`, `go.sum` | [references/issues-go.md](references/issues-go.md) |
+| `openai`, `anthropic`, `langchain`, `@ai-sdk`, `semantic-kernel` imports | [../_shared/owasp-llm-top-10.md](../_shared/owasp-llm-top-10.md) |
 | Any files | [references/issues-general.md](references/issues-general.md) — always load |
 
 Load multiple if the diff spans stacks (e.g. a full-stack PR touches both `.cs` and `.tsx`).
@@ -196,6 +197,7 @@ When reviewing a branch (no PR URL), skip title/description/work item checks —
 - [ ] Auth checks in place and correct
 - [ ] Sensitive data handling (passwords, tokens, PII)
 - [ ] Dependency vulnerabilities
+- [ ] LLM integration security (if applicable): prompt injection, output sanitization, tool permissions, system prompt secrets, rate limiting
 
 ### Bugs & Logic (Critical)
 - [ ] Null/undefined handling

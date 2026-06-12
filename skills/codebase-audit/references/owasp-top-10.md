@@ -360,6 +360,7 @@ grep -rn "exec\(.*req\.\|spawn\(" --include="*.js" . # Command injection
 ## Resources
 
 - [OWASP Top 10 2021](https://owasp.org/www-project-top-ten/)
+- [OWASP Top 10 for LLM Applications 2025](https://genai.owasp.org/llm-top-10/) - For projects integrating LLMs, see [LLM-specific reference](../../_shared/owasp-llm-top-10.md)
 - [OWASP Cheat Sheets](https://cheatsheetseries.owasp.org/)
 - [CWE Top 25](https://cwe.mitre.org/top25/)
 

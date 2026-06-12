@@ -52,6 +52,7 @@ Load relevant issue references:
 Also load shared references:
 - `../_shared/security-checklist.md`
 - `../_shared/performance-anti-patterns.md`
+- `../_shared/owasp-llm-top-10.md` - If diff touches LLM integration code (imports from `openai`, `anthropic`, `langchain`, `@ai-sdk`, `semantic-kernel`, etc.)
 
 ## Step 2: Review for Correctness
 
@@ -72,6 +73,17 @@ Apply security checklist from shared references:
 - Auth checks on protected operations
 - Sensitive data not logged or exposed in errors
 - No secrets in the diff
+
+**If the diff touches LLM integration code** (check for imports from `openai`, `anthropic`, `langchain`, `@ai-sdk`, `semantic-kernel`):
+
+- Prompt injection: user input separated from system instructions, not concatenated
+- Output handling: LLM output sanitized before use in HTML, SQL, shell, or file paths
+- Tool permissions: least privilege, no open-ended shell/SQL/URL tools
+- System prompts: no secrets, API keys, or internal URLs embedded
+- Rate limiting and token budgets on LLM endpoints
+- Human approval on destructive LLM-triggered actions
+
+See `../_shared/owasp-llm-top-10.md` for detection patterns and code examples.
 
 ## Step 4: Review for Performance
 

@@ -64,6 +64,8 @@ Parse the JSON output from these tools and integrate what you find into the audi
 
 **OWASP Top 10 checks:** See [references/owasp-top-10.md](references/owasp-top-10.md) for vulnerability patterns and detection commands. Report findings as **critical** with file:line, what the risk is, and how to fix it.
 
+**OWASP LLM Top 10 checks:** If the project integrates LLMs (check for `openai`, `anthropic`, `langchain`, `@ai-sdk`, `semantic-kernel` imports), see [../_shared/owasp-llm-top-10.md](../_shared/owasp-llm-top-10.md) for LLM-specific vulnerability patterns covering prompt injection, insecure output handling, excessive agency, and more. Report findings as **critical**.
+
 **Accessibility checks:** Check [references/accessibility-checklist.md](references/accessibility-checklist.md) for a11y detection commands and testing procedures. Report these as **important** because they exclude real users from using the app.
 
 **Monitoring/Observability:**
@@ -105,6 +107,7 @@ Surface these issues with full context right away - don't bury them:
 - Missing authentication or authorization checks
 - Unsafe ways of handling data
 - Sensitive endpoints that are exposed
+- LLM-specific vulnerabilities: prompt injection, insecure output handling, excessive tool agency, system prompt leakage
 - .NET projects: see [auth](references/dotnet-security-auth.md), [data](references/dotnet-security-data.md), [crypto](references/dotnet-security-crypto.md)
 
 **TypeScript Configuration (if it's a TypeScript project)**
@@ -225,6 +228,7 @@ Need more detailed guidance? Check these references:
 - **[Tech Stack Detection](references/tech-stack-detection.md)** - How to figure out what package managers, frameworks, cloud platforms, and IaC tools they're using
 - **[Secret Scanning Reference](references/secret-scanning.md)** - Complete guide to running TruffleHog on both current files and git history, plus common patterns and how to fix them
 - **[OWASP Top 10 Reference](references/owasp-top-10.md)** - Detection patterns and grep commands for finding all OWASP Top 10 vulnerabilities, with severity guidelines
+- **[OWASP LLM Top 10 Reference](../_shared/owasp-llm-top-10.md)** - LLM-specific security risks: prompt injection, output handling, excessive agency, system prompt leakage, vector store weaknesses
 - **[CI/CD Pipeline Security](references/ci-cd-security.md)** - GitHub Actions, Azure Pipelines, GitLab CI security issues and detection commands
 - **[Accessibility Checklist](references/accessibility-checklist.md)** - Practical commands for finding a11y issues and testing for WCAG compliance
 - **[Report Template](references/report-template.md)** - What the final report should look like, with example critical issues
