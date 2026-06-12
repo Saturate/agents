@@ -8,7 +8,7 @@ Decompose work into small, verifiable tasks. Each task should be completable in 
 
 ## Prerequisites
 
-Read the spec (`SPEC.md`, `docs/SPEC.md`, or a file under `spec/`) and the relevant codebase sections before planning. If no spec exists, stop and tell the user to run `/spec` first.
+Read the spec (`SPEC.md`, `docs/SPEC.md`, or a file under `spec/`) and the relevant codebase sections before planning. If no spec exists, stop and ask the user to run `/spec` first.
 
 ## Process
 

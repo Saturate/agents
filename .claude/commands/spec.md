@@ -8,7 +8,7 @@ Write a structured spec before any code. The spec is the shared source of truth;
 
 ## When to skip
 
-Single-file fixes, config changes, or tasks where requirements are unambiguous and self-contained.
+Single-file fixes, config changes, or tasks where requirements are unambiguous and self-contained. Note: `/build auto` requires a spec, so always run `/spec` before autonomous multi-task builds.
 
 ## Process
 
@@ -16,7 +16,7 @@ Single-file fixes, config changes, or tasks where requirements are unambiguous a
 
 Before writing anything, list what you're assuming:
 
-```
+```text
 ASSUMPTIONS:
 1. This is a web application (not native mobile)
 2. Authentication uses session-based cookies (not JWT)
@@ -37,7 +37,7 @@ Silent assumptions are the #1 source of wasted work. Don't fill in ambiguous req
 
 Read the project's dependency files (`package.json`, `go.mod`, `Cargo.toml`, `.csproj`, `pyproject.toml`, etc.) to identify exact versions. State what you found:
 
-```
+```text
 STACK DETECTED:
 - React 19.1.0 (from package.json)
 - Vite 6.2.0
@@ -90,7 +90,7 @@ Anything unresolved that needs human input.
 
 ### 5. Reframe vague requirements as success criteria
 
-```
+```text
 REQUIREMENT: "Make the dashboard faster"
 
 SUCCESS CRITERIA:

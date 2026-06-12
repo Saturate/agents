@@ -13,6 +13,8 @@ Invoke the `incremental-implementation` skill alongside `tdd`.
 
 ## Default: one task
 
+A plan (`tasks/plan.md`) must exist. If none exists, stop and ask the user to run `/plan` first.
+
 Pick the next pending task from `tasks/plan.md`. Then:
 
 1. Read the task's acceptance criteria
@@ -30,7 +32,7 @@ Removes the manual stepping between tasks, **not** the verification. Every task 
 
 ### 1. Require a spec
 
-Look for a spec at a known path: `SPEC.md` at the repo root, `docs/SPEC.md`, or a file under `spec/`. A README or arbitrary doc does **not** count. If none exists, stop and tell the user to run `/spec` first. Do not invent requirements.
+Look for a spec at a known path: `SPEC.md` at the repo root, `docs/SPEC.md`, or a file under `spec/`. A README or arbitrary doc does **not** count. If none exists, stop and ask the user to run `/spec` first. Do not invent requirements.
 
 ### 2. Establish a clean baseline
 

@@ -85,12 +85,12 @@ CONTRACT: <paste contract>
 
 After the single-model review, offer the user a cross-model second opinion:
 
-> *"Single-model review complete. Want a cross-model second opinion? Options: Gemini CLI, Codex CLI, manual external review, or skip."*
+> *"Single-model review complete. Want a cross-model second opinion? Options: Gemini CLI, another CLI tool, manual external review, or skip."*
 
 This question is mandatory in every interactive doubt cycle. The user decides whether the cost is worth it.
 
 If the user picks a CLI:
-1. Check the tool is in PATH (`which gemini`, `which codex`)
+1. Check the tool is in PATH (`which gemini`, or the relevant CLI)
 2. Test it works before passing the full prompt
 3. Write the prompt to a temp file and pipe via stdin (never inline shell-quoted; code contains backticks and `$(...)` that will execute)
 4. Pass ARTIFACT + CONTRACT + adversarial prompt only. No session context, no CLAIM

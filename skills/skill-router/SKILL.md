@@ -4,7 +4,7 @@ description: Meta-skill that maps tasks to the right skill. Consult at the start
 user-invocable: true
 metadata:
   author: Saturate
-  version: "1.0"
+  version: "3.0"
 ---
 
 # Skill Router
@@ -22,7 +22,7 @@ Task arrives
   ├── About to plan non-trivial work ─────────→ pre-planning
   │
   ├── Implementing something ─────────────────→ /build  (or: incremental-implementation)
-  │     ├── Implement the whole plan at once ─→ /build auto
+  │     ├── Implement the whole plan (requires approval) ─→ /build auto
   │     ├── UI / React / component work ──────→ frontend-ui-engineering
   │     ├── HTTP / API / contract design ─────→ api-design
   │     └── Writing tests first ──────────────→ tdd
@@ -43,7 +43,7 @@ Task arrives
   ├── Writing prose (blog, article, docs) ────→ no-ai-slop
   ├── Writing an ADR / architecture doc ──────→ documentation-adrs
   │
-  ├── Pre-launch / deploy readiness ──────────→ /ship  (parallel fan-out review)
+  ├── Pre-launch / deploy readiness ──────────→ /ship  (parallel review, human go/no-go)
   │
   └── Action skills (narrow, tool-specific):
         ├── Adding a dependency ──────────────→ evaluating-dependencies
@@ -62,7 +62,7 @@ Task arrives
 ## Rules
 
 1. **Check the router before starting non-trivial work.** Vague prompts default to `idea-refine`. "Build X" without a spec defaults to `/spec` first.
-2. **Workflow skills are chainable.** A typical feature: `/spec` → `/plan` → `/build` → `pr-review` → `push` → `make-pr`. The full autonomous path: `/spec` → `/build auto`.
+2. **Workflow skills are chainable.** A typical feature: `/spec` → `/plan` → `/build` → `pr-review` → `push` → `make-pr`. The full autonomous path: `/spec` → `/build auto`. All paths require explicit human approval before execution; no step auto-deploys or runs destructive operations without sign-off.
 3. **Action skills gate specific tool calls.** Installing a package? `evaluating-dependencies` first. Committing? `commit`. Opening a PR? `make-pr`. These are enforced by the `skill-router` plugin's PreToolUse advisor where it applies — but consult them regardless.
 4. **Skills are not suggestions.** When a skill applies, follow its steps in order. Skipping the verification step of a workflow skill is the same as not running it.
 5. **When multiple apply, run them in sequence.** Example: a UI feature → `pre-planning` → `frontend-ui-engineering` → `incremental-implementation` → `tdd` → `pr-review`.
