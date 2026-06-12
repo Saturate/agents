@@ -140,6 +140,7 @@ emit_event() {
 model_pricing() {
   local model="$1"
   case "$model" in
+    *fable*)  echo "10.00 50.00" ;;
     *opus*)   echo "5.00 25.00" ;;
     *sonnet*) echo "3.00 15.00" ;;
     *haiku*)  echo "1.00 5.00" ;;

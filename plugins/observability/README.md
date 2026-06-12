@@ -109,6 +109,7 @@ Token costs are estimated using Anthropic's published rates at the time of the l
 
 | Model | Input (per 1M) | Output (per 1M) |
 |-------|---------------|----------------|
+| Fable | $10.00 | $50.00 |
 | Opus | $5.00 | $25.00 |
 | Sonnet | $3.00 | $15.00 |
 | Haiku | $1.00 | $5.00 |
