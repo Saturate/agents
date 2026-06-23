@@ -11,7 +11,10 @@
 
 set -uo pipefail
 
-command -v jq >/dev/null 2>&1 || exit 0
+if ! command -v jq >/dev/null 2>&1; then
+  printf '%s\n' '{ "decision": "block", "reason": "jq is required for skill-router hooks. Install it: brew install jq (macOS) or apt install jq (Linux)." }'
+  exit 0
+fi
 
 if [ -t 0 ]; then
   exit 0
