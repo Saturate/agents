@@ -64,6 +64,26 @@ TIMESTAMP=$(utc_timestamp)
 # Duration tracking via nanosecond timestamps
 if [ "$EVENT" = "pre" ]; then
   nano_timestamp > "$TIMING_DIR/$TOOL_USE_ID" 2>/dev/null || true
+
+  # Claude Code never fires PostToolUse for MCP tools, so successful MCP
+  # calls go unrecorded. Emit a pre_only event as a workaround so the call
+  # is counted. Consumers should treat pre_only as success with unknown duration.
+  case "$TOOL_NAME" in
+    mcp__*)
+      MCP_ENTRY=$(echo "$ENTRY" | jq -c '.event = "pre_only"')
+      emit_event "tool-usage" "$MCP_ENTRY" "$(jq -cn \
+        --arg source "claude-code" \
+        --arg event "tool" \
+        --arg tool_name "$TOOL_NAME" \
+        --arg project "$PROJECT" \
+        '{source: $source, event: $event, tool_name: $tool_name, project: $project}')"
+
+      # Count toward per-turn tool total since PostToolUse won't
+      TURN_TOOLS_FILE="$TIMING_DIR/turn-tools-$SESSION_ID"
+      CURRENT=$(cat "$TURN_TOOLS_FILE" 2>/dev/null || echo 0)
+      echo $((CURRENT + 1)) > "$TURN_TOOLS_FILE"
+      ;;
+  esac
 fi
 
 DURATION_MS="null"
