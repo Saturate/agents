@@ -4,7 +4,7 @@ description: Meta-skill that maps tasks to the right skill. Consult at the start
 user-invocable: true
 metadata:
   author: Saturate
-  version: "1.0"
+  version: "3.0"
 ---
 
 # Skill Router
@@ -17,12 +17,17 @@ This project ships workflow skills (*how to approach a type of work*) and action
 Task arrives
   │
   ├── Vague idea, fuzzy goal ─────────────────→ idea-refine
+  ├── Need a spec before building ────────────→ /spec  (produces SPEC.md)
+  ├── Need a plan from a spec ────────────────→ /plan  (produces tasks/plan.md)
   ├── About to plan non-trivial work ─────────→ pre-planning
   │
-  ├── Implementing something ─────────────────→ incremental-implementation
+  ├── Implementing something ─────────────────→ /build  (or: incremental-implementation)
+  │     ├── Implement the whole plan (requires approval) ─→ /build auto
   │     ├── UI / React / component work ──────→ frontend-ui-engineering
   │     ├── HTTP / API / contract design ─────→ api-design
   │     └── Writing tests first ──────────────→ tdd
+  │
+  ├── Non-trivial decision under uncertainty ─→ doubt-driven-development
   │
   ├── Something is broken ────────────────────→ debugging
   │     └── Looking for classes of bugs ──────→ hunting-bugs
@@ -38,7 +43,7 @@ Task arrives
   ├── Writing prose (blog, article, docs) ────→ no-ai-slop
   ├── Writing an ADR / architecture doc ──────→ documentation-adrs
   │
-  ├── Pre-launch / deploy readiness ──────────→ launch-checklist
+  ├── Pre-launch / deploy readiness ──────────→ /ship  (parallel review, human go/no-go)
   │
   └── Action skills (narrow, tool-specific):
         ├── Adding a dependency ──────────────→ evaluating-dependencies
@@ -56,8 +61,8 @@ Task arrives
 
 ## Rules
 
-1. **Check the router before starting non-trivial work.** Vague prompts default to `idea-refine`. "Build X" without a spec defaults to `pre-planning` first.
-2. **Workflow skills are chainable.** A typical feature: `pre-planning` → `incremental-implementation` → `tdd` → `pr-review` → `push` → `make-pr`.
+1. **Check the router before starting non-trivial work.** Vague prompts default to `idea-refine`. "Build X" without a spec defaults to `/spec` first.
+2. **Workflow skills are chainable.** A typical feature: `/spec` → `/plan` → `/build` → `pr-review` → `push` → `make-pr`. The full autonomous path: `/spec` → `/build auto`. All paths require explicit human approval before execution; no step auto-deploys or runs destructive operations without sign-off.
 3. **Action skills gate specific tool calls.** Installing a package? `evaluating-dependencies` first. Committing? `commit`. Opening a PR? `make-pr`. These are enforced by the `skill-router` plugin's PreToolUse advisor where it applies — but consult them regardless.
 4. **Skills are not suggestions.** When a skill applies, follow its steps in order. Skipping the verification step of a workflow skill is the same as not running it.
 5. **When multiple apply, run them in sequence.** Example: a UI feature → `pre-planning` → `frontend-ui-engineering` → `incremental-implementation` → `tdd` → `pr-review`.
@@ -92,18 +97,22 @@ A task isn't done until there's evidence — passing tests, build output, runtim
 
 ## Quick reference
 
-| Phase | Skill | One-line |
+| Phase | Skill / Command | One-line |
 |---|---|---|
 | Define | idea-refine | Sharpen vague ideas |
+| Define | `/spec` | Write structured spec, produce SPEC.md |
 | Define | pre-planning | Gather context before planning |
-| Plan | (use pre-planning output) | |
+| Plan | `/plan` | Break spec into tasks, produce tasks/plan.md |
+| Build | `/build` | Implement next task (one slice) |
+| Build | `/build auto` | Implement the whole plan in one approved pass |
 | Build | incremental-implementation | Vertical slices, verify each |
 | Build | tdd | Red-green-refactor |
+| Build | doubt-driven-development | Fresh-context adversarial review per decision |
 | Build | frontend-ui-engineering | UI with accessibility + performance |
 | Build | api-design | Contract-first with security focus |
 | Verify | debugging | Follow evidence, root cause |
 | Verify | hunting-bugs | Pattern-based bug audit |
-| Verify | performance-profiling | Measure → identify → fix → measure |
+| Verify | performance-profiling | Measure, identify, fix, measure |
 | Verify | security-deep-dive | Threat modeling, attack surface |
 | Review | pr-review | Full PR review with checklists |
 | Review | code-review | Code-level review |
@@ -112,7 +121,8 @@ A task isn't done until there's evidence — passing tests, build output, runtim
 | Review | code-metrics | LOC, complexity, dup signals |
 | Review | documentation-adrs | Decision records |
 | Write | no-ai-slop | Anti-slop prose writing |
-| Ship | launch-checklist | Deploy readiness |
+| Ship | `/ship` | Parallel fan-out review, go/no-go + rollback |
+| Ship | launch-checklist | Deploy readiness checklist |
 | Ship | commit | Commit message style |
 | Ship | push | Run quality gates before pushing |
 | Ship | make-pr | Open PR with context-aware description |

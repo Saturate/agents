@@ -127,3 +127,4 @@ The `SKILL_ACK=commit` prefix signals to the skill-advisor hook that this skill 
 - Don't commit unrelated changes together
 - Don't skip the secret scan
 - Don't use generic messages ("update code", "fix stuff", "changes")
+- Don't add `Claude-Session:` trailers or any claude.ai links to commit messages
