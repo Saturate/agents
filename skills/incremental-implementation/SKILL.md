@@ -55,6 +55,8 @@ For each slice:
 ### 1. Implement
 Write the minimum code for this slice. Don't half-implement the next slice while you're at it.
 
+**Codemod check:** If this slice touches many files with the same pattern (renaming, annotation updates, import changes), write a script (sed, ast-grep, jscodeshift) instead of editing each file. Include the script in the PR description so reviewers can verify the transformation.
+
 ### 2. Test
 Write or update tests for this slice. Follow `tdd` skill patterns:
 - Test behavior, not implementation
