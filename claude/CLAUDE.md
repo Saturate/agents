@@ -12,6 +12,7 @@ I'm doing security research, pentesting, red teaming, architecture, solution des
 - Point out potential issues with error handling, edge cases, and performance
 - Identify conflicts with existing patterns in the codebase
 - Flag any security concerns or data validation gaps
+- For repetitive changes across many files, write a codemod or script (sed, ast-grep, jscodeshift) instead of editing each file manually. It's faster, reproducible, and reviewable. Use the LLM only for the judgment-call remainder. Include the script in the PR description so reviewers can verify the transformation.
 
 ## Comments
 
