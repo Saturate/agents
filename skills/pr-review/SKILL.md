@@ -134,12 +134,44 @@ From the changed file list, detect the tech stack and load **only** the relevant
 | `*.ts`, `*.tsx`, `*.js`, `*.jsx`, `*.vue`, `*.svelte` | [references/issues-typescript.md](references/issues-typescript.md) |
 | `*.cs`, `*.csproj`, `*.sln`, `*.razor` | [references/issues-dotnet.md](references/issues-dotnet.md) |
 | `*.go`, `go.mod`, `go.sum` | [references/issues-go.md](references/issues-go.md) |
+| `*.rs`, `Cargo.toml`, `Cargo.lock` | [references/issues-rust.md](references/issues-rust.md) |
 | `openai`, `anthropic`, `langchain`, `@ai-sdk`, `semantic-kernel` imports | [../_shared/owasp-llm-top-10.md](../_shared/owasp-llm-top-10.md) |
 | Any files | [references/issues-general.md](references/issues-general.md) — always load |
 
 Load multiple if the diff spans stacks (e.g. a full-stack PR touches both `.cs` and `.tsx`).
 
-## Step 2c: Review Existing Comments (PR URL only)
+## Step 2c: Run Project Quality Gates
+
+Run the project's own quality tools before reviewing manually. These catch issues faster than reading.
+
+**Detect and run what's available:**
+
+```bash
+# Check what's configured
+cat package.json Cargo.toml go.mod *.csproj Makefile 2>/dev/null | head -100
+```
+
+| Stack | Tool | Command | What it catches |
+|---|---|---|---|
+| **Rust** | cargo clippy | `cargo clippy --all-targets --workspace -- -D warnings` | Hundreds of lint patterns, many from issues-rust.md |
+| **Rust** | cargo test | `cargo test --workspace` | Regressions |
+| **Rust** | cargo audit | `cargo audit` (if installed) | Known dependency vulnerabilities |
+| **TypeScript** | tsc | `npx tsc --noEmit` | Type errors |
+| **TypeScript** | eslint | `npx eslint --no-warn-ignored .` or check package.json scripts | Lint violations |
+| **TypeScript** | tests | `npm test` or `pnpm test` | Regressions |
+| **Go** | go vet | `go vet ./...` | Suspicious constructs |
+| **Go** | staticcheck | `staticcheck ./...` (if installed) | Extended analysis |
+| **Go** | go test | `go test ./...` | Regressions |
+| **.NET** | dotnet build | `dotnet build --no-restore` | Compiler warnings |
+| **.NET** | dotnet test | `dotnet test --no-build` | Regressions |
+
+**Rules:**
+- Only run tools that are already configured in the project. Don't install new linters during a review.
+- If a tool fails, include the output in your review findings. Don't try to fix things during review.
+- If tests fail on the base branch too, note it as pre-existing.
+- Skip long-running tasks (full integration suites, e2e) unless the user asks.
+
+## Step 2d: Review Existing Comments (PR URL only)
 
 When reviewing via PR URL, fetch existing review comments and threads before starting your own review:
 
@@ -378,3 +410,4 @@ Only suggest mitigations for recurring patterns or critical issues. Don't sugges
 - **[TypeScript Issues](references/issues-typescript.md)** - Type safety, TS/JS patterns, error handling, UI/accessibility, testing
 - **[.NET Issues](references/issues-dotnet.md)** - C#/.NET patterns, Entity Framework, async pitfalls
 - **[Go Issues](references/issues-go.md)** - Error handling, concurrency, naming, performance
+- **[Rust Issues](references/issues-rust.md)** - Unsafe, ownership, serde, async/tokio, integer overflow, defensive patterns
