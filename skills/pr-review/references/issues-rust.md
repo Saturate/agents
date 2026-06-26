@@ -65,11 +65,11 @@ let x: u32 = my_f32.to_bits();
 ```rust
 // Bad — panics on None/Err
 let value = map.get("key").unwrap();
-let data = file.read_to_string().unwrap();
+let data = std::fs::read_to_string("config.toml").unwrap();
 
 // Good — propagate or provide context
 let value = map.get("key").ok_or_else(|| Error::MissingKey("key"))?;
-let data = file.read_to_string().map_err(|e| Error::ReadFailed(path, e))?;
+let data = std::fs::read_to_string(path).map_err(|e| Error::ReadFailed(path, e))?;
 ```
 
 ### Opaque Error Messages
@@ -594,12 +594,12 @@ let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("testdata/fixture.json");
 | Box<dyn> overhead | `rg 'Box<dyn'` (check if generics work) | Minor |
 | Debug on secrets | `rg 'derive.*Debug' -A5` (check for password/token fields) | Important |
 | serde(default) on sensitive | `rg 'serde.default' -A3` (check field names) | Important |
-| Silent truncation (as) | `rg ' as [iu](8|16|32)\b'` | Important |
+| Silent truncation (as) | `rg ' as [iu]\d+\b'` | Important |
 | Unchecked arithmetic | `rg '\.checked_' --glob '*.rs'` (should exist near math) | Minor |
-| Blocking in async | `rg 'std::fs\|std::net' --glob '*.rs'` (in async context) | Critical |
+| Blocking in async | `rg 'std::fs' --glob '*.rs'` and `rg 'std::net' --glob '*.rs'` (in async context) | Critical |
 | std Mutex in async | `rg 'std::sync::Mutex' --glob '*.rs'` (check for .await) | Important |
 | Rc<RefCell<T>> | `rg 'Rc<RefCell'` | Minor |
-| TOCTOU on paths | `rg 'remove_file\|remove_dir' -A3` (check for create after) | Important |
+| TOCTOU on paths | `rg 'remove_file' -A3` and `rg 'remove_dir' -A3` (check for create after) | Important |
 | from_utf8_lossy | `rg 'from_utf8_lossy'` (check if data is truly text) | Minor |
 | Init after construct | `rg 'fn new\(\)' -A5` (check for required init call) | Minor |
 | mem::forget | `rg 'mem::forget'` | Important |
