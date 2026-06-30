@@ -6,7 +6,7 @@ allowed-tools: Read Grep Glob Bash
 argument-hint: "[branch-name or PR URL]"
 metadata:
   author: Saturate
-  version: "3.0"
+  version: "3.1"
 ---
 
 # Code Review
