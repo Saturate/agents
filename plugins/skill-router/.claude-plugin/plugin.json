@@ -1,7 +1,7 @@
 {
   "name": "skill-router",
   "description": "Injects a skill-routing meta-skill at session start and enforces skill consultation via block/flow advisories on high-signal Bash commands (git commit, rm -rf, npm install, gh pr create, etc). Skills unlock blocked commands with the SKILL_ACK prefix.",
-  "version": "3.0.0",
+  "version": "3.1.0",
   "author": {
     "name": "Saturate"
   },

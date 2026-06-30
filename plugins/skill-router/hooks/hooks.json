@@ -24,7 +24,7 @@
         ]
       },
       {
-        "matcher": "mcp__.*__repo_create_pull_request",
+        "matcher": "mcp__.*__repo_create_pull_request$",
         "hooks": [
           {
             "type": "command",

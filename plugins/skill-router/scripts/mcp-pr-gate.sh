@@ -24,7 +24,7 @@ INPUT=$(cat)
 TOOL_NAME=$(printf '%s' "$INPUT" | jq -r '.tool_name // empty' 2>/dev/null)
 
 case "$TOOL_NAME" in
-  *repo_create_pull_request*)
+  *repo_create_pull_request)
     jq -cn '{ decision: "block", reason: "Do not create PRs via MCP tools. Invoke the `/make-pr` skill instead — it uses CLI commands with proper gating, generates context-aware descriptions, and confirms with the user before posting." }'
     ;;
 esac

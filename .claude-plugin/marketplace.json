@@ -20,7 +20,7 @@
       "name": "skill-router",
       "source": "./plugins/skill-router",
       "description": "Injects a skill-routing meta-skill at session start and emits just-in-time skill advisories before high-signal Bash commands (npm install, cargo add, git commit, dotnet add package, etc).",
-      "version": "3.0.0"
+      "version": "3.1.0"
     }
   ]
 }
