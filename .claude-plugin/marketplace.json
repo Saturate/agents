@@ -8,7 +8,7 @@
       "name": "agents",
       "source": ".",
       "description": "Skills, plugins, and config for AI coding agents",
-      "version": "1.1.0"
+      "version": "1.2.0"
     },
     {
       "name": "observability",

@@ -4,7 +4,7 @@ description: "Runs project quality gates before pushing. Auto-detects lint, form
 allowed-tools: Bash Read
 metadata:
   author: Saturate
-  version: "1.0"
+  version: "1.1"
 ---
 
 # Push
@@ -164,8 +164,11 @@ git diff --stat $(git merge-base HEAD main)..HEAD
 - Only docs, config, or CI files changed (`.md`, `.yml`, `.json`, `.toml`)
 - Single-commit, single-file fix (typo, version bump, one-liner)
 - The user explicitly said to skip (`--no-review`)
+- The `pr-review` loop already reported `VERDICT: CLEAN` on the current HEAD commit earlier in this session
 
-If a review is warranted, invoke `/code-review`. Fix any Critical or Important findings, then re-run `/code-review` to verify the fixes didn't introduce new issues. Repeat until clean. Amend all fixes along with any gate fixes in Step 3.
+If a review is warranted, invoke `/pr-review loop` (loop mode: a fresh subagent reviews each round, this agent fixes, repeats until clean). Do not self-review inline; the point is a reviewer that did not write the code. Amend all fixes along with any gate fixes in Step 3.
+
+If the loop hits its iteration cap or a ping-pong stop without a clean verdict, report the remaining findings and ask the user whether to push anyway.
 
 ## Step 3: Amend if any gate changed files
 

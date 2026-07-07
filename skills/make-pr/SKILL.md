@@ -5,7 +5,7 @@ compatibility: Requires git repository, gh CLI for GitHub or az CLI + azure-devo
 allowed-tools: Bash
 metadata:
   author: Saturate
-  version: "2.0"
+  version: "2.1"
 ---
 
 You are helping the user create a pull request on GitHub or Azure DevOps. Follow these steps:
@@ -257,13 +257,14 @@ Before generating the PR description, review the changes that will be in the PR.
 git diff --stat $target_branch...$current_branch
 ```
 
-**Always run `/code-review` unless:**
+**Always run `/pr-review loop` unless:**
 - The PR is docs-only (all changed files are `.md`, `.txt`, `.rst`)
 - The user passed `--no-review`
+- The `pr-review` loop already reported `VERDICT: CLEAN` on the current HEAD commit earlier in this session (typically via the `push` skill just before this)
 
-Fix any Critical findings before proceeding. For Important findings, either fix them or note them as known issues in the PR description. Amend fixes into the relevant commits.
+Loop mode spawns a fresh subagent reviewer each round, fixes Critical and Important findings in this context, and repeats until the reviewer reports clean. Do not self-review inline; the point is a reviewer that did not write the code.
 
-After fixing, re-run `/code-review` to verify the fixes are clean and didn't introduce new issues. Repeat until no Critical findings remain. Then re-run the diff analysis from Step 3 to update the commit information.
+If the loop stops without a clean verdict (iteration cap or ping-pong), list the remaining findings as known issues in the PR description and ask the user whether to proceed. After any fixes, re-run the diff analysis from Step 3 to update the commit information.
 
 ## Step 4: Generate PR Title and Description
 

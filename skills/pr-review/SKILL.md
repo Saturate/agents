@@ -1,12 +1,12 @@
 ---
 name: pr-review
-description: Performs comprehensive code reviews checking for bugs, security issues, performance problems, testing gaps, and code quality. Accepts branch names or PR URLs (GitHub/Azure DevOps) to automatically checkout and review. Use when reviewing PRs, pull requests, code changes, commits, diffs, or when asked to review code, check code, audit changes, review my changes, check PR, review branch, or perform code review.
+description: Performs comprehensive code reviews checking for bugs, security issues, performance problems, testing gaps, and code quality. Accepts branch names or PR URLs (GitHub/Azure DevOps) to automatically checkout and review. Supports a loop mode that reviews with a fresh subagent, fixes findings, and repeats until clean. Use when reviewing PRs, pull requests, code changes, commits, diffs, or when asked to review code, check code, audit changes, review my changes, check PR, review branch, review until clean, or perform code review.
 compatibility: Basic tools - grep, file reading. Optional: gh CLI for GitHub PRs, az CLI for Azure DevOps PRs
-allowed-tools: Read Grep Glob Bash
-argument-hint: "[branch-name or PR URL]"
+allowed-tools: Read Grep Glob Bash Task
+argument-hint: "[loop] [branch-name or PR URL]"
 metadata:
   author: Saturate
-  version: "3.1"
+  version: "3.2"
 ---
 
 # Code Review
@@ -27,6 +27,45 @@ The skill accepts optional arguments to determine what to review:
 - Example: `/pr-review https://github.com/owner/repo/pull/123`
 - Example: `/pr-review https://dev.azure.com/org/project/_git/repo/pullrequest/456`
 - Platform-specific integration details are in reference files (loaded only when needed)
+
+**`loop` keyword:** Review with a fresh subagent, fix the findings, re-review until clean. See [Loop Mode](#loop-mode).
+- Example: `/pr-review loop`
+- Example: `/pr-review loop feat/redirect`
+- Example: `/pr-review loop --model sonnet` (reviewer model, default `opus`)
+
+## Loop Mode
+
+A review-fix cycle for changes this session authored. A reviewer that shares the author's context anchors on its own reasoning and validates its own code, so the review runs in a **fresh subagent** each round. The main agent never reviews in loop mode; it orchestrates and fixes.
+
+**Roles:**
+- **Subagent (reviewer):** reads the diff cold, reports findings, changes nothing.
+- **Main agent (fixer):** runs gates, spawns the reviewer, applies fixes, commits.
+
+**Setup, once before the first iteration:**
+1. Resolve what to review as in Step 1. Skip checkout if already on the branch.
+2. Run the project quality gates from Step 2c and fix any failures first. Gates are deterministic; the reviewer should spend its context on judgment, not on rediscovering type errors.
+
+**Each iteration (max 5):**
+
+1. Spawn a fresh subagent via the Task tool, model `opus` unless the user passed `--model`. Never reuse a reviewer from an earlier iteration; a follow-up review inherits the previous verdict.
+2. The subagent prompt must contain:
+   - Invoke the `pr-review` skill and follow Steps 0, 2, and 2b. Skip Step 1 (no checkout, no stash, review `HEAD` against `origin/<base>` in place) and Step 2c (gates already ran). Read-only: change nothing.
+   - The accepted-findings list from earlier iterations, if any, framed as "deliberate decisions, do not re-flag".
+   - Required output: the standard Output Format, ending with a single line `VERDICT: CLEAN` when there are no Critical or Important findings, otherwise `VERDICT: FINDINGS`.
+3. On `VERDICT: CLEAN`: stop. Report iterations used and what was fixed across all rounds.
+4. On `VERDICT: FINDINGS`:
+   - Fix every Critical and Important finding.
+   - Minor findings: fix when the fix is a few lines; otherwise add to the accepted-findings list with a one-line reason.
+   - If a finding is factually wrong or conflicts with project guidelines, do not fix it; add it to accepted-findings with the reason.
+   - Re-run the gates the fixes touch (typecheck, tests).
+   - Amend the fixes into the relevant commit if the branch is not pushed yet; otherwise create a new commit via the `commit` skill.
+
+**Stop conditions:**
+- `VERDICT: CLEAN` → done.
+- A finding asks to reverse a fix from an earlier iteration (ping-pong). Stop, present both positions to the user.
+- 5 iterations without a clean verdict. Stop, report the remaining findings, let the user decide.
+
+Loop mode is local only. Never post reviews or comments externally from the loop.
 
 ## Step 0: Read Project Guidelines
 

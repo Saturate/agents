@@ -4,7 +4,7 @@ description: Meta-skill that maps tasks to the right skill. Consult at the start
 user-invocable: true
 metadata:
   author: Saturate
-  version: "3.0"
+  version: "3.1"
 ---
 
 # Skill Router
@@ -36,6 +36,7 @@ Task arrives
   ├── Security review / threat model ─────────→ security-deep-dive
   │
   ├── Reviewing code / PR ────────────────────→ pr-review  (also: code-review)
+  │     └── Review-fix until clean ───────────→ pr-review loop  (fresh subagent per round)
   ├── Simplifying code ───────────────────────→ code-simplification
   ├── Whole-codebase audit ───────────────────→ codebase-audit
   ├── Measuring code (LOC, complexity, dup) ──→ code-metrics
@@ -62,7 +63,7 @@ Task arrives
 ## Rules
 
 1. **Check the router before starting non-trivial work.** Vague prompts default to `idea-refine`. "Build X" without a spec defaults to `/spec` first.
-2. **Workflow skills are chainable.** A typical feature: `/spec` → `/plan` → `/build` → `pr-review` → `push` → `make-pr`. The full autonomous path: `/spec` → `/build auto`. All paths require explicit human approval before execution; no step auto-deploys or runs destructive operations without sign-off.
+2. **Workflow skills are chainable.** A typical feature: `/spec` → `/plan` → `/build` → `pr-review loop` → `push` → `make-pr`. The `push` and `make-pr` skills run the review loop themselves when it hasn't already passed on the current HEAD. The full autonomous path: `/spec` → `/build auto`. All paths require explicit human approval before execution; no step auto-deploys or runs destructive operations without sign-off.
 3. **Action skills gate specific tool calls.** Installing a package? `evaluating-dependencies` first. Committing? `commit`. Opening a PR? `make-pr`. These are enforced by the `skill-router` plugin's PreToolUse advisor where it applies — but consult them regardless.
 4. **Skills are not suggestions.** When a skill applies, follow its steps in order. Skipping the verification step of a workflow skill is the same as not running it.
 5. **When multiple apply, run them in sequence.** Example: a UI feature → `pre-planning` → `frontend-ui-engineering` → `incremental-implementation` → `tdd` → `pr-review`.
@@ -114,7 +115,7 @@ A task isn't done until there's evidence — passing tests, build output, runtim
 | Verify | hunting-bugs | Pattern-based bug audit |
 | Verify | performance-profiling | Measure, identify, fix, measure |
 | Verify | security-deep-dive | Threat modeling, attack surface |
-| Review | pr-review | Full PR review with checklists |
+| Review | pr-review | Full PR review with checklists; `loop` mode reviews with a fresh subagent and fixes until clean |
 | Review | code-review | Code-level review |
 | Review | code-simplification | Simplify safely |
 | Review | codebase-audit | Whole-repo health |
