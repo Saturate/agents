@@ -1,5 +1,11 @@
 ---
+name: plan
 description: Break work into small verifiable tasks with acceptance criteria and dependency ordering. Produces tasks/plan.md.
+user-invocable: true
+allowed-tools: Read Grep Glob Bash
+metadata:
+  author: Saturate
+  version: "1.0"
 ---
 
 # Plan

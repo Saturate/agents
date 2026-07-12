@@ -1,5 +1,11 @@
 ---
+name: spec
 description: Write a structured specification before writing code. Produces SPEC.md.
+user-invocable: true
+allowed-tools: Read Grep Glob Bash
+metadata:
+  author: Saturate
+  version: "1.0"
 ---
 
 # Spec

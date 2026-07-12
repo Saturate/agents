@@ -1,5 +1,11 @@
 ---
+name: ship
 description: Run parallel pre-launch review with code-reviewer, security-auditor, and test-engineer, then synthesize a go/no-go decision.
+user-invocable: true
+allowed-tools: Read Grep Glob Bash Agent
+metadata:
+  author: Saturate
+  version: "1.0"
 ---
 
 # Ship

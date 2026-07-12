@@ -87,3 +87,7 @@ Replace with plain equivalents or cut entirely.
 ## Self-check
 
 Before returning any prose: scan for banned words, banned characters, filler transitions, academic tells, and intensifiers without evidence. Fix every hit.
+
+# Artifacts
+
+Do not create Artifacts unless explicitly asked or given permission. Default to plain text, file writes, or SendUserFile for deliverables.

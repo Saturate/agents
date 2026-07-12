@@ -1,5 +1,11 @@
 ---
+name: build
 description: Implement tasks incrementally; build, test, verify, commit. Add "auto" to run the whole plan in one approved pass.
+user-invocable: true
+allowed-tools: Read Grep Glob Bash Edit Write
+metadata:
+  author: Saturate
+  version: "1.0"
 ---
 
 Invoke the `incremental-implementation` skill alongside `tdd`.

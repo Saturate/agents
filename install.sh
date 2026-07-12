@@ -204,12 +204,16 @@ setup_claude() {
 # ─── OpenCode ──────────────────────────────────────────────────
 
 setup_opencode() {
+    local target_dir="${XDG_CONFIG_HOME:-$HOME/.config}/opencode"
     echo "Setting up OpenCode..."
     echo "  Source: $SCRIPT_DIR"
+    echo "  Target: $target_dir"
     echo ""
 
+    mkdir -p "$target_dir"
+
     # User-level commands
-    local cmd_dir="${XDG_CONFIG_HOME:-$HOME/.config}/opencode/commands"
+    local cmd_dir="$target_dir/commands"
     mkdir -p "$cmd_dir"
 
     for cmd_file in "$SCRIPT_DIR"/opencode/command/*.md; do
@@ -219,13 +223,22 @@ setup_opencode() {
     done
 
     # User-level agents
-    local agent_dir="${XDG_CONFIG_HOME:-$HOME/.config}/opencode/agents"
+    local agent_dir="$target_dir/agents"
     mkdir -p "$agent_dir"
 
     for agent_file in "$SCRIPT_DIR"/opencode/agent/*.md; do
         [ -f "$agent_file" ] || continue
         local name=$(basename "$agent_file")
         create_link "opencode/agent/$name" "$agent_file" "$agent_dir/$name"
+    done
+
+    # Skills
+    local skills_dir="$target_dir/skills"
+    mkdir -p "$skills_dir"
+
+    local skills=($(detect_skills))
+    for skill in "${skills[@]}"; do
+        create_link "opencode/skills/$skill" "$SCRIPT_DIR/skills/$skill" "$skills_dir/$skill"
     done
 
     echo ""
