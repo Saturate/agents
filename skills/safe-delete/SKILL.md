@@ -106,10 +106,10 @@ If the backup isn't there, **stop** and tell the user.
 
 ## Step 3: Delete
 
-Use the `SKILL_ACK=safe-delete` prefix so the advisor hook lets it through:
+Use the `SKILL_ACK=<nonce>:safe-delete` prefix so the advisor hook lets it through:
 
 ```bash
-SKILL_ACK=safe-delete rm -rf <path>
+SKILL_ACK=$(cat ~/.claude/.skill-nonce):safe-delete rm -rf <path>
 ```
 
 ## Step 4: Verify Nothing Broke

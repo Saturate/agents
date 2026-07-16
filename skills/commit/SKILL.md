@@ -112,13 +112,13 @@ Common types: `feat`, `fix`, `refactor`, `chore`, `docs`, `test`, `perf`, `ci`
 Show the user the proposed commit message. Wait for approval or edits. Then:
 
 ```bash
-SKILL_ACK=commit git commit -m "$(cat <<'EOF'
+SKILL_ACK=$(cat ~/.claude/.skill-nonce):commit git commit -m "$(cat <<'EOF'
 the commit message here
 EOF
 )"
 ```
 
-The `SKILL_ACK=commit` prefix signals to the skill-advisor hook that this skill has been consulted.
+The `SKILL_ACK=<nonce>:commit` prefix signals to the skill-advisor hook that this skill has been consulted. The nonce is generated per session and prevents bypassing the skill.
 
 ## Anti-Patterns
 

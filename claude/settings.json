@@ -101,7 +101,7 @@
       "Bash(go doc:*)",
       "Bash(cargo build:*)",
       "Bash(git push:*)",
-      "Bash(SKILL_ACK=push*)",
+      "Bash(SKILL_ACK=*)",
       "Bash(ls:*)",
       "Bash(mkdir:*)",
       "Bash(xargs:*)",
@@ -231,6 +231,10 @@
           {
             "type": "command",
             "command": "bash /Users/alkj/code/github/agents/claude/hooks/safe-port-kill.sh"
+          },
+          {
+            "type": "command",
+            "command": "bash /Users/alkj/code/github/agents/claude/hooks/strip-session-url.sh"
           }
         ]
       }

@@ -192,7 +192,7 @@ This keeps all gate-related fixes in the existing commit instead of creating "fi
 All gates passed. Push with the skill acknowledgment:
 
 ```bash
-SKILL_ACK=push git push origin HEAD
+SKILL_ACK=$(cat ~/.claude/.skill-nonce):push git push origin HEAD
 ```
 
 If the original command had specific flags (e.g., `-u`, `--set-upstream`, a specific remote), preserve them.
@@ -202,9 +202,9 @@ If the original command had specific flags (e.g., `-u`, `--set-upstream`, a spec
 The default is to run all detected gates. To skip specific gates, prefix the push command:
 
 ```bash
-SKILL_ACK=push:skip-tests git push origin HEAD
-SKILL_ACK=push:skip-build git push origin HEAD
-SKILL_ACK=push:skip-tests,skip-build git push origin HEAD
+SKILL_ACK=$(cat ~/.claude/.skill-nonce):push:skip-tests git push origin HEAD
+SKILL_ACK=$(cat ~/.claude/.skill-nonce):push:skip-build git push origin HEAD
+SKILL_ACK=$(cat ~/.claude/.skill-nonce):push:skip-tests,skip-build git push origin HEAD
 ```
 
 Only skip when the user gives a reason (e.g., "just pushing docs, skip tests").

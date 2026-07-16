@@ -386,14 +386,14 @@ If user chooses to edit:
 ### GitHub
 
 ```bash
-SKILL_ACK=make-pr gh pr create --title "$title" --body "$description" \
+SKILL_ACK=$(cat ~/.claude/.skill-nonce):make-pr gh pr create --title "$title" --body "$description" \
   ${base_branch:+--base "$base_branch"} \
   ${draft:+--draft} \
   ${reviewers:+--reviewer "$reviewers"} \
   ${labels:+--label "$labels"}
 ```
 
-The `SKILL_ACK=make-pr` prefix signals to the skill-advisor hook that this skill has been consulted.
+The `SKILL_ACK=<nonce>:make-pr` prefix signals to the skill-advisor hook that this skill has been consulted. The nonce is generated per session and prevents bypassing the skill.
 
 **Common errors:**
 - PR already exists → Show existing PR URL with `gh pr list --head $current_branch`
@@ -405,7 +405,7 @@ See [references/github-pr.md](references/github-pr.md) for detailed options and 
 ### Azure DevOps
 
 ```bash
-SKILL_ACK=make-pr az repos pr create --title "$title" --description "$description" \
+SKILL_ACK=$(cat ~/.claude/.skill-nonce):make-pr az repos pr create --title "$title" --description "$description" \
   ${base_branch:+--target-branch "$base_branch"} \
   ${draft:+--draft true} \
   ${reviewers:+--required-reviewers "$reviewers"} \

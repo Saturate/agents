@@ -4,16 +4,19 @@
 #
 # Three rule types in advisor-rules.conf:
 #   block — Blocks the tool call with a nudge to invoke the named skill.
-#           The skill unlocks the command via SKILL_ACK=<skill> prefix.
+#           The skill unlocks the command via SKILL_ACK=<nonce>:<skill>.
 #   gate  — Blocks the tool call with a custom reason (no skill needed).
 #           Show the user what you're about to do, get approval, then
-#           re-run with SKILL_ACK=<gate-name> prefix.
+#           re-run with SKILL_ACK=<nonce>:<gate-name> prefix.
 #   flow  — Adds advisory context about a skill for the next step.
 #           Non-blocking, emits additionalContext.
 #
-# No file markers or external state. The SKILL_ACK=<name> prefix in
-# the command itself is the only unlock mechanism — controlled by the
-# skill (for block) or the model after user approval (for gate).
+# The SKILL_ACK=<nonce>:<name> prefix is the only unlock mechanism.
+# The nonce is generated per session by inject-meta-skill.sh and stored
+# at ~/.claude/.skill-nonce. A bare SKILL_ACK=<name> (no nonce) is
+# treated as the model guessing the prefix and is rejected; the
+# SKILL_ACK= prefix is stripped and the underlying command gets matched
+# against rules as if it were never there.
 
 set -uo pipefail
 
@@ -40,10 +43,23 @@ CMD=$(printf '%s' "$INPUT" | jq -r '.tool_input.command // empty' 2>/dev/null)
 # are possible but rare in Claude Code tool_input commands.
 NORM_CMD=$(printf '%s' "$CMD" | sed -E 's/[[:space:]]*&&[[:space:]]*/\n/g; s/[[:space:]]*;[[:space:]]*/\n/g')
 
-# Strip segments already acknowledged via SKILL_ACK= prefix.  Remaining
-# unacknowledged segments still get matched against rules — bundling a
-# gated command with a SKILL_ACK'd one won't sneak it through.
-NORM_CMD=$(printf '%s\n' "$NORM_CMD" | grep -v '^[[:space:]]*SKILL_ACK=' || true)
+# Validate SKILL_ACK nonce: only strip acknowledged segments whose nonce
+# matches the current session nonce. A bare SKILL_ACK=<skill-name> without
+# a valid nonce is treated as unacknowledged (the model guessed it).
+NONCE_FILE="$HOME/.claude/.skill-nonce"
+SESSION_NONCE=""
+[ -f "$NONCE_FILE" ] && SESSION_NONCE=$(cat "$NONCE_FILE" 2>/dev/null)
+
+if [ -n "$SESSION_NONCE" ]; then
+  # Strip properly acknowledged lines (correct nonce)
+  NORM_CMD=$(printf '%s\n' "$NORM_CMD" | grep -v "^[[:space:]]*SKILL_ACK=${SESSION_NONCE}:" || true)
+  # Lines with invalid/missing nonce: strip the SKILL_ACK= prefix so the
+  # underlying command still gets matched against advisor rules.
+  NORM_CMD=$(printf '%s\n' "$NORM_CMD" | sed -E 's/^([[:space:]]*)SKILL_ACK=[^ ]+ /\1/')
+else
+  # Fallback: no nonce file, accept old-style SKILL_ACK=<name>
+  NORM_CMD=$(printf '%s\n' "$NORM_CMD" | grep -v '^[[:space:]]*SKILL_ACK=' || true)
+fi
 [ -z "$NORM_CMD" ] && exit 0
 
 # Walk rules: block on first block match, collect flow advisories
