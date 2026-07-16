@@ -34,14 +34,28 @@ is_flat_dep_section() {
   [[ "$leaf" == "dependencies" || "$leaf" == "dev-dependencies" || "$leaf" == "build-dependencies" ]]
 }
 
-# Map a dep section name to the cargo add flag
+# Map a dep section name to cargo add flags (--dev, --build, --target)
 dep_section_flag() {
   local s="$1"
   local leaf="${s##*.}"
+  local flags=""
+
   case "$leaf" in
-    dev-dependencies)   echo " --dev" ;;
-    build-dependencies) echo " --build" ;;
+    dev-dependencies)   flags=" --dev" ;;
+    build-dependencies) flags=" --build" ;;
   esac
+
+  # Extract --target from sections like target.'cfg(windows)'.dependencies
+  if [[ "$s" =~ ^target\.(.+)\.(dev-|build-)?dependencies$ ]]; then
+    local target_spec="${BASH_REMATCH[1]}"
+    target_spec="${target_spec#\'}"
+    target_spec="${target_spec%\'}"
+    target_spec="${target_spec#\"}"
+    target_spec="${target_spec%\"}"
+    flags="${flags} --target '${target_spec}'"
+  fi
+
+  printf '%s' "$flags"
 }
 
 # Detect new dep-like lines in a dependencies section
@@ -66,8 +80,9 @@ scan_for_new_deps() {
     echo "$line" | /usr/bin/grep -qE '^[a-z][a-z0-9_-]* *= *("|'"'"'|\{)' || continue
     local crate
     crate=$(echo "$line" | /usr/bin/sed 's/ *=.*//')
-    # Skip if crate already in reference (it's a modification, not an addition)
-    echo "$reference" | /usr/bin/grep -qE "^${crate} *=" && continue
+    # Skip if crate already in reference (Edit passes full lines with "=",
+    # Write passes bare crate names from the awk extraction)
+    echo "$reference" | /usr/bin/grep -qE "^${crate}( *=|$)" && continue
 
     local flags
     flags=$(dep_section_flag "$current_section")
@@ -81,7 +96,13 @@ scan_for_new_deps() {
       fi
     fi
 
-    found="${found}  cargo add ${crate}${flags}${features}"$'\n'
+    # Detect optional = true
+    local optional=""
+    if echo "$line" | /usr/bin/grep -qE 'optional *= *true'; then
+      optional=" --optional"
+    fi
+
+    found="${found}  cargo add ${crate}${flags}${features}${optional}"$'\n'
   done <<< "$new_content"
 
   printf '%s' "$found"
