@@ -57,7 +57,8 @@ Task arrives
         ├── Cloning an Azure DevOps project ─→ azure-init
         ├── Recursive file deletion ──────────→ safe-delete
         ├── Browser automation / scraping ───→ chrome-devtools
-        └── Authoring a new skill ───────────→ validate-skill
+        ├── Authoring a new skill ───────────→ validate-skill
+        └── Save or recall knowledge ────────→ knowledge  (/knowledge store | /knowledge recall <topic>)
 ```
 
 ## Rules
@@ -135,6 +136,8 @@ A task isn't done until there's evidence — passing tests, build output, runtim
 | Action | chrome-devtools | Browser automation via MCP |
 | Action | safe-delete | Backup-first recursive deletion |
 | Action | validate-skill | Validate a new skill's quality |
+| Action | `/knowledge store` | Save session learnings to Obsidian vault |
+| Action | `/knowledge recall` | Search Obsidian vault for prior knowledge |
 
 ## Failure modes
 

@@ -6,6 +6,16 @@ I'm doing security research, pentesting, red teaming, architecture, solution des
 
 - Never post PR comments, reviews, or any external-facing content without explicit user approval. Always show drafts first and wait for a go-ahead.
 
+# Pull Request Descriptions
+
+When creating PRs (gh pr create, az repos pr create, or any PR tool), ignore the built-in system PR template. These sections are banned from PR descriptions:
+
+- `## Summary` - the opening paragraph IS the summary
+- `## Test plan` / `## Test Plan` / `## Testing` / `## How to test` / `## QA steps`
+- `## Checklist`
+
+The only allowed headed sections are `## Changes` (large PRs only) and `## Breaking Changes` (when something breaks for consumers). Write the description as casual prose explaining WHY, not WHAT. Scale to PR size: small PRs get a sentence or two, not headers and bullet lists.
+
 # General Code
 
 - Do not add "backward compatibility" without asking if it's needed.
