@@ -309,7 +309,7 @@ Only these headed sections may appear, and only when their conditions are met:
 
 | Section | When to include |
 |---|---|
-| `## Changes` | Large PRs (5+ commits or 300+ lines) |
+| `## Changes` | Large PRs (5+ commits or 300+ lines), only when changes span unrelated areas and grouping by intent helps reviewers |
 | `## Breaking Changes` | Something breaks for consumers |
 | Repo-template sections | Only if Step 3b found a PR template |
 
@@ -319,7 +319,7 @@ No other `##` sections. Period.
 
 - **Tone:** Casual, humble engineer explaining to a peer
 - **Focus:** Explain WHY decisions were made, not WHAT the code does
-- **Avoid:** Robot speak, marketing language, obvious observations, em dashes
+- **Avoid:** Robot speak, marketing language, obvious observations, em dashes, file/directory counts ("11 files across X, Y, Z" - the PR UI shows this)
 - **Include:** Non-obvious choices, trade-offs, constraints
 
 #### Templates by size
@@ -346,19 +346,27 @@ Switched from polling to SSE for notifications because polling was hammering the
 
 **Large PR (5+ commits, 300+ lines):**
 
-Intro + optional context paragraph + `## Changes` with why-focused bullets. Call out risk areas inline, not in a separate section.
+Intro + optional context paragraph. `## Changes` only when the PR spans unrelated areas and grouping by intent helps reviewers understand why things are bundled. Never list files or directories; the diff view does that.
 
 ```
 [What changed and why, 1-2 sentences]
 
 [More context if needed: why this approach, what you considered, any gotchas]
 
-## Changes
-- What changed and why (not just "added X")
-- Another change
-- Another change
-
 [Risk callout inline: "touches the payment path" or "low risk, just config"]
+```
+
+With `## Changes` (only when it earns its keep):
+
+```
+Reworked the auth flow to support SAML alongside existing OAuth.
+
+## Changes
+- SAML negotiation and assertion parsing (the new path)
+- OAuth token refresh now shares the session store with SAML
+- Config schema updated; old format auto-migrates on startup
+
+Touches the login path end-to-end, worth a careful look.
 ```
 
 #### Extra rules
