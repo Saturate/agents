@@ -6,167 +6,123 @@ allowed-tools: Read Grep Glob Bash Task
 argument-hint: "[loop] [branch-name or PR URL]"
 metadata:
   author: Saturate
-  version: "3.2"
+  version: "3.4"
 ---
 
 # Code Review
 
-Review code like a senior engineer - thorough but practical. Focus on things that actually matter. Don't waste time on style nitpicks a linter should catch.
+Thorough but practical. Focus on what matters. Skip style nitpicks linters catch.
 
 ## Arguments
 
-The skill accepts optional arguments to determine what to review:
+**No arguments:** Ask user if they want to review the current branch.
 
-**No arguments:** Ask user if they want to review the current branch
+**Branch name:** `/pr-review feat/redirect`
 
-**Branch name:** Checkout the branch and review it
-- Example: `/pr-review feat/redirect`
-- Example: `/pr-review feature/add-auth`
+**PR URL:** `/pr-review https://github.com/owner/repo/pull/123` or Azure DevOps equivalent. Platform-specific details in reference files.
 
-**PR URL:** Supports GitHub and Azure DevOps PR URLs
-- Example: `/pr-review https://github.com/owner/repo/pull/123`
-- Example: `/pr-review https://dev.azure.com/org/project/_git/repo/pullrequest/456`
-- Platform-specific integration details are in reference files (loaded only when needed)
-
-**`loop` keyword:** Review with a fresh subagent, fix the findings, re-review until clean. See [Loop Mode](#loop-mode).
-- Example: `/pr-review loop`
-- Example: `/pr-review loop feat/redirect`
-- Example: `/pr-review loop --model sonnet` (reviewer model, default `opus`)
+**`loop`:** Review-fix cycle with fresh subagents. See [Loop Mode](#loop-mode).
+- `/pr-review loop` | `/pr-review loop feat/redirect` | `/pr-review loop --model sonnet`
 
 ## Loop Mode
 
-A review-fix cycle for changes this session authored. A reviewer that shares the author's context anchors on its own reasoning and validates its own code, so the review runs in a **fresh subagent** each round. The main agent never reviews in loop mode; it orchestrates and fixes.
+Review-fix cycle for changes this session authored. The review runs in a **fresh subagent** each round because a reviewer sharing the author's context anchors on its own reasoning. The main agent orchestrates and fixes; it never reviews.
 
 **Roles:**
-- **Subagent (reviewer):** reads the diff cold, reports findings, changes nothing.
-- **Main agent (fixer):** runs gates, spawns the reviewer, applies fixes, commits.
+- **Subagent (reviewer):** reads diff cold, reports findings, changes nothing.
+- **Main agent (fixer):** runs gates, spawns reviewer, applies fixes, commits.
 
-**Setup, once before the first iteration:**
-1. Resolve what to review as in Step 1. Skip checkout if already on the branch.
-2. Run the project quality gates from Step 2c and fix any failures first. Gates are deterministic; the reviewer should spend its context on judgment, not on rediscovering type errors.
+**Setup (once):**
+1. Resolve what to review per Step 1. Skip checkout if already on the branch.
+2. Run quality gates (Step 2c) and fix failures first.
 
 **Each iteration (max 5):**
 
-1. Spawn a fresh subagent via the Task tool, model `opus` unless the user passed `--model`. Never reuse a reviewer from an earlier iteration; a follow-up review inherits the previous verdict.
-2. The subagent prompt must contain:
-   - Invoke the `pr-review` skill and follow Steps 0, 2, and 2b. Skip Step 1 (no checkout, no stash, review `HEAD` against `origin/<base>` in place) and Step 2c (gates already ran). Read-only: change nothing.
-   - The accepted-findings list from earlier iterations, if any, framed as "deliberate decisions, do not re-flag".
-   - Required output: the standard Output Format, ending with a single line `VERDICT: CLEAN` when there are no Critical or Important findings, otherwise `VERDICT: FINDINGS`.
-3. On `VERDICT: CLEAN`: stop. Report iterations used and what was fixed across all rounds.
-4. On `VERDICT: FINDINGS`:
-   - Fix every Critical and Important finding.
-   - Minor findings: fix when the fix is a few lines; otherwise add to the accepted-findings list with a one-line reason.
-   - If a finding is factually wrong or conflicts with project guidelines, do not fix it; add it to accepted-findings with the reason.
-   - Re-run the gates the fixes touch (typecheck, tests).
-   - Amend the fixes into the relevant commit if the branch is not pushed yet; otherwise create a new commit via the `commit` skill.
+1. Spawn a fresh subagent via Task tool, model `opus` unless `--model` overrides. Never reuse a prior reviewer.
+2. Subagent prompt:
+   - Follow Steps 0, 2, 2b. Skip Steps 1 and 2c. Read-only.
+   - Accepted-findings list from prior iterations as "deliberate decisions, do not re-flag".
+   - Output: standard Output Format, ending with `VERDICT: CLEAN` (no Critical/Important) or `VERDICT: FINDINGS`.
+3. `VERDICT: CLEAN` → stop, report iterations and fixes.
+4. `VERDICT: FINDINGS`:
+   - Fix Critical and Important findings.
+   - Minor: fix if trivial, otherwise add to accepted-findings with reason.
+   - Wrong or guideline-conflicting findings: add to accepted-findings with reason.
+   - Re-run affected gates. Amend if not pushed; otherwise new commit via `commit` skill.
 
-**Stop conditions:**
-- `VERDICT: CLEAN` → done.
-- A finding asks to reverse a fix from an earlier iteration (ping-pong). Stop, present both positions to the user.
-- 5 iterations without a clean verdict. Stop, report the remaining findings, let the user decide.
+**Stop conditions:** Clean verdict. Ping-pong (reverses a prior fix) → stop, present both positions. 5 iterations without clean → stop, report remaining.
 
-Loop mode is local only. Never post reviews or comments externally from the loop.
+Loop mode is local only. Never post reviews externally from the loop.
 
 ## Step 0: Read Project Guidelines
 
-**Before reviewing code, scan for project-specific guidelines:**
+Scan for project-specific rules before reviewing:
 
-1. Check for `CLAUDE.md` or `AGENT.md` in the repository root
-2. Check for global guidelines at `~/.claude/CLAUDE.md`
-3. Scan `README.md` and any `docs/` directory for coding standards or contribution guides
-4. Extract any rules relevant to code review (type safety, testing, style, backward compatibility, etc.)
+1. `CLAUDE.md` or `AGENT.md` in repo root
+2. Global guidelines at `~/.claude/CLAUDE.md`
+3. `README.md` and `docs/` for coding standards
 
-These project-specific rules become additional checklist items during your review. Flag violations as Important or Critical depending on severity.
-
-If no guideline files exist, proceed with general best practices only.
+These become additional checklist items. Flag violations as Important or Critical.
 
 ## Step 1: Determine What to Review
 
-**Before any checkout, save current state:**
+**Save current state first:**
 ```text
 original_branch=$(git branch --show-current)
 git stash push -m "pr-review: temporary stash" 2>/dev/null && stashed=true || stashed=false
 ```
 
-**If no arguments provided:**
-1. Check current git branch: `git branch --show-current`
-2. Ask user: "Review current branch `{branch-name}`?" (Yes/No)
-3. If No, ask: "Which branch or PR URL should I review?"
-4. Proceed based on response
+**No arguments:** Ask user to confirm current branch or specify another.
 
-**If arguments provided:**
+**URL argument:** Detect platform from URL:
+- `github.com` → read [references/github-pr-integration.md](references/github-pr-integration.md)
+- `dev.azure.com` / `visualstudio.com` → read [references/azure-pr-integration.md](references/azure-pr-integration.md)
+- Other → unsupported, exit.
 
-**1. Detect if URL:**
+Keep PR metadata (title, description, author, work items) for the PR Quality section.
+
+**Branch argument:**
 ```text
-if [[ "$args" =~ ^https?:// ]]; then
-  # It's a URL, determine platform
-  if [[ "$args" =~ github\.com ]]; then
-    # GitHub PR - READ references/github-pr-integration.md
-    # Extracts: owner, repo, PR number, title, description, author
-    # Checks out the branch for review
-  elif [[ "$args" =~ dev\.azure\.com|visualstudio\.com ]]; then
-    # Azure DevOps PR - READ references/azure-pr-integration.md
-    # Extracts: org, project, repo, PR number, title, description, author, work items
-    # Checks out the branch for review
-  else
-    echo "❌ Unsupported PR URL. Supports GitHub and Azure DevOps only."
-    exit 1
-  fi
-fi
-```
-
-**Keep the PR metadata** (title, description, author, work items) — you'll need it for the PR Quality section of the review.
-
-**2. If not URL, treat as branch name:**
-```text
-# Fetch latest changes
 git fetch origin
-
-# Checkout branch
-if git rev-parse --verify "$args" &> /dev/null; then
-  git checkout "$args"
-  git pull origin "$args"
-else
-  git checkout -b "$args" "origin/$args" 2>/dev/null || {
-    echo "❌ Branch '$args' not found locally or on remote"
-    exit 1
-  }
-fi
+git checkout "$args" && git pull origin "$args" ||
+  git checkout -b "$args" "origin/$args" || exit 1
 ```
 
-**3. Verify we're on a branch (not detached HEAD):**
-```text
-current_branch=$(git branch --show-current)
-if [ -z "$current_branch" ]; then
-  echo "❌ Detached HEAD state - cannot review"
-  exit 1
-fi
-```
+Verify not in detached HEAD state.
+
+## Step 1b: Delegate if Session Authored the Changes
+
+If this session did any work on the branch (commits, edits, fixes), delegate the review to a fresh subagent. If uncertain, delegate. A reviewer that wrote the code validates its own reasoning.
+
+**Delegate:**
+1. Complete Step 1 (checkout, stash).
+2. Run Step 2c (quality gates).
+3. Spawn a fresh subagent (model `opus` unless overridden) with:
+   - Follow Steps 0, 2, 2b, 2d and the Review Checklist. Skip Steps 1 and 2c. Read-only.
+   - Gate results from Step 2c.
+   - Output: standard Output Format.
+4. Present findings to user, proceed to Step 3.
+
+**No session work on the branch:** Review inline (Steps 2 through 3).
 
 ## Step 2: Scope the Review to the Diff
 
-**After checkout, get exactly what changed — this is your review target, not the whole codebase:**
+Review only what changed, not the whole codebase:
 
 ```text
-# Detect base branch
 base=$(git remote show origin 2>/dev/null | grep 'HEAD branch' | awk '{print $NF}')
 base=${base:-main}
 
-# Get the full diff
 git diff "origin/$base...HEAD"
-
-# Get changed file list (use this to decide which files to read)
 git diff --name-only "origin/$base...HEAD"
-
-# Understand the commit history
 git log "origin/$base...HEAD" --oneline
 ```
 
-**Only read and review files that appear in `git diff --name-only`.** Do not explore the full codebase. Check the diff first to understand what changed, then read specific files only when you need more context than the diff provides (e.g. to understand how a changed function is called).
+Only read files from `git diff --name-only`. Read surrounding context only when the diff isn't enough.
 
 ## Step 2b: Detect Tech Stack and Load Relevant Issues
 
-From the changed file list, detect the tech stack and load **only** the relevant issue reference files:
+Load issue references based on file extensions in the diff:
 
 | Files in diff | Load reference |
 |---|---|
@@ -174,159 +130,137 @@ From the changed file list, detect the tech stack and load **only** the relevant
 | `*.cs`, `*.csproj`, `*.sln`, `*.razor` | [references/issues-dotnet.md](references/issues-dotnet.md) |
 | `*.go`, `go.mod`, `go.sum` | [references/issues-go.md](references/issues-go.md) |
 | `*.rs`, `Cargo.toml`, `Cargo.lock` | [references/issues-rust.md](references/issues-rust.md) |
-| `openai`, `anthropic`, `langchain`, `@ai-sdk`, `semantic-kernel` imports | [../_shared/owasp-llm-top-10.md](../_shared/owasp-llm-top-10.md) |
-| Any files | [references/issues-general.md](references/issues-general.md) — always load |
+| LLM SDK imports (`openai`, `anthropic`, `langchain`, `@ai-sdk`, `semantic-kernel`) | [../_shared/owasp-llm-top-10.md](../_shared/owasp-llm-top-10.md) |
+| Any files | [references/issues-general.md](references/issues-general.md) - always load |
 
-Load multiple if the diff spans stacks (e.g. a full-stack PR touches both `.cs` and `.tsx`).
+Load multiple if the diff spans stacks.
 
 ## Step 2c: Run Project Quality Gates
 
-Run the project's own quality tools before reviewing manually. These catch issues faster than reading.
-
-**Detect and run what's available:**
+Run existing project quality tools before manual review:
 
 ```bash
-# Check what's configured
 cat package.json Cargo.toml go.mod *.csproj Makefile 2>/dev/null | head -100
 ```
 
-| Stack | Tool | Command | What it catches |
-|---|---|---|---|
-| **Rust** | cargo clippy | `cargo clippy --all-targets --workspace -- -D warnings` | Hundreds of lint patterns, many from issues-rust.md |
-| **Rust** | cargo test | `cargo test --workspace` | Regressions |
-| **Rust** | cargo audit | `cargo audit` (if installed) | Known dependency vulnerabilities |
-| **TypeScript** | tsc | `npx tsc --noEmit` | Type errors |
-| **TypeScript** | eslint | `npx eslint --no-warn-ignored .` or check package.json scripts | Lint violations |
-| **TypeScript** | tests | `npm test` or `pnpm test` | Regressions |
-| **Go** | go vet | `go vet ./...` | Suspicious constructs |
-| **Go** | staticcheck | `staticcheck ./...` (if installed) | Extended analysis |
-| **Go** | go test | `go test ./...` | Regressions |
-| **.NET** | dotnet build | `dotnet build --no-restore` | Compiler warnings |
-| **.NET** | dotnet test | `dotnet test --no-build` | Regressions |
+| Stack | Tool | Command |
+|---|---|---|
+| Rust | clippy | `cargo clippy --all-targets --workspace -- -D warnings` |
+| Rust | test | `cargo test --workspace` |
+| Rust | audit | `cargo audit` (if installed) |
+| TypeScript | tsc | `npx tsc --noEmit` |
+| TypeScript | eslint | `npx eslint --no-warn-ignored .` or package.json scripts |
+| TypeScript | test | `npm test` or `pnpm test` |
+| Go | vet | `go vet ./...` |
+| Go | staticcheck | `staticcheck ./...` (if installed) |
+| Go | test | `go test ./...` |
+| .NET | build | `dotnet build --no-restore` |
+| .NET | test | `dotnet test --no-build` |
 
-**Rules:**
-- Only run tools that are already configured in the project. Don't install new linters during a review.
-- If a tool fails, include the output in your review findings. Don't try to fix things during review.
-- If tests fail on the base branch too, note it as pre-existing.
-- Skip long-running tasks (full integration suites, e2e) unless the user asks.
+Only run what's configured. Don't install new tools. Include failures in findings. Note pre-existing failures. Skip e2e unless asked.
 
 ## Step 2d: Review Existing Comments (PR URL only)
 
-When reviewing via PR URL, fetch existing review comments and threads before starting your own review:
+Fetch existing threads before reviewing:
 
 **GitHub:**
 ```text
-# Get current user
 gh api user --jq '.login'
-
 gh pr view $pr_number --repo $owner/$repo --comments
-gh api repos/$owner/$repo/pulls/$pr_number/comments  # inline review comments
+gh api repos/$owner/$repo/pulls/$pr_number/comments
 ```
 
 **Azure DevOps:**
 ```text
-# Get current user
 az ad signed-in-user show --query displayName -o tsv
-
 az repos pr thread list --id $pr_number --organization https://dev.azure.com/$org --project "$project"
 ```
 
-**How to handle comments:**
-
-**Active threads from others:**
-- Evaluate whether the feedback is valid, already addressed, or missed something
-- Note your assessment (agree/disagree/context) for the Existing Discussion section
-
-**Active threads from the current user (our own comments):**
-- Skip these in the Existing Discussion section — don't agree/disagree with yourself
-- But do check: has the author addressed our feedback? If not, flag it as unresolved
-
-**Resolved/closed threads:**
-- Don't skip these blindly — check if the resolution actually addressed the concern in the code
-- If a thread was resolved but the underlying issue is still present, flag it as "Resolved but not fixed"
+- **Others' active threads:** Assess validity, note agreement/disagreement for Existing Discussion section.
+- **Own active threads:** Skip in Existing Discussion, but check if author addressed the feedback.
+- **Resolved threads:** Verify the resolution actually fixed the issue in code. Flag "resolved but not fixed" if not.
 
 ## Review Checklist
 
-Use this checklist to guide your review, together with the language-specific issue references loaded above.
+Use with the language-specific issue references loaded above.
 
-### PR Quality (Review First — when reviewing a PR URL)
-- [ ] Title is clear and descriptive (not "fix bug" or "update code")
-- [ ] Description explains WHY, not just WHAT
-- [ ] Complex changes have explanation or context
-- [ ] Visual changes include screenshots/recordings
-- [ ] Breaking changes are clearly marked
-- [ ] Related issues/tickets are linked (GitHub) or work items linked (Azure DevOps)
-- [ ] Work items are appropriate for the changes (Azure DevOps)
-- [ ] Description helps reviewers understand impact
-- [ ] PR size is reasonable — flag if >500 lines changed, suggest splitting if it mixes unrelated concerns
+### PR Quality (PR URL only)
+- [ ] Clear, descriptive title
+- [ ] Description explains WHY
+- [ ] Complex changes have context
+- [ ] Visual changes have screenshots
+- [ ] Breaking changes marked
+- [ ] Issues linked (GitHub) or work items linked (Azure DevOps)
+- [ ] PR size reasonable (flag >500 lines, suggest splitting mixed concerns)
 
-When reviewing a branch (no PR URL), skip title/description/work item checks — evaluate the code only.
+Skip PR quality checks when reviewing a branch without a PR URL.
+
+For detailed evaluation guidance, see [references/review-template.md](references/review-template.md#evaluating-pr-quality).
 
 ### Security (Critical)
 - [ ] Input validation and sanitization
-- [ ] SQL injection, XSS, command injection risks
-- [ ] Auth checks in place and correct
+- [ ] SQL injection, XSS, command injection
+- [ ] Auth checks correct
 - [ ] Sensitive data handling (passwords, tokens, PII)
 - [ ] Dependency vulnerabilities
-- [ ] LLM integration security (if applicable): prompt injection, output sanitization, tool permissions, system prompt secrets, rate limiting
+- [ ] LLM security (if applicable): prompt injection, output sanitization, tool permissions, rate limiting
 
 ### Bugs & Logic (Critical)
 - [ ] Null/undefined handling
-- [ ] Edge cases (empty arrays, null values, boundaries)
-- [ ] Error handling in place
-- [ ] Race conditions or concurrency issues
-- [ ] State management issues
+- [ ] Edge cases (empty arrays, boundaries)
+- [ ] Error handling
+- [ ] Race conditions / concurrency
+- [ ] State management
 
 ### Performance (Important)
-- [ ] Algorithm complexity (watch for O(n²) where O(n) exists)
-- [ ] N+1 query problems
+- [ ] Algorithm complexity (O(n^2) where O(n) exists)
+- [ ] N+1 queries
 - [ ] Memory leaks (listeners, subscriptions, closures)
-- [ ] Blocking operations that should be async
+- [ ] Blocking ops that should be async
 
 ### Testing (Important)
 - [ ] Changes covered by tests
-- [ ] Tests verify actual behavior
-- [ ] Edge cases tested
-- [ ] Error conditions tested
+- [ ] Tests verify behavior, not implementation
+- [ ] Edge cases and error conditions tested
 
 ### Code Quality
-- [ ] Code is understandable
-- [ ] No unnecessary complexity or clever code
+- [ ] Understandable code
+- [ ] No unnecessary complexity
 - [ ] Duplication worth extracting
-- [ ] Names match what they do
-- [ ] **Follows project guidelines (CLAUDE.md, AGENT.md, README, docs)**
+- [ ] Names match intent
+- [ ] Follows project guidelines (CLAUDE.md, AGENT.md, README)
 
-### Accessibility (Important — UI changes only)
-- [ ] Interactive elements are keyboard accessible (focusable, operable without mouse)
-- [ ] Images have meaningful alt text (or `alt=""` if decorative)
-- [ ] Color is not the only way information is conveyed
-- [ ] Form inputs have associated labels
-- [ ] Focus is managed correctly after dynamic content changes (modals, toasts, route changes)
-- [ ] ARIA attributes are used correctly — prefer semantic HTML over ARIA when possible
+### Accessibility (UI changes only)
+- [ ] Keyboard accessible interactive elements
+- [ ] Meaningful alt text on images
+- [ ] Color not sole information channel
+- [ ] Form inputs have labels
+- [ ] Focus managed after dynamic changes
+- [ ] Semantic HTML preferred over ARIA
 
-### Dependencies (Important — if packages were added or updated)
-- [ ] New packages are justified — is there a simpler built-in alternative?
-- [ ] Package is actively maintained and not abandoned
-- [ ] No known security vulnerabilities (`npm audit` / `dotnet list package --vulnerable`)
-- [ ] Bundle size impact is acceptable for frontend packages
+### Dependencies (if packages changed)
+- [ ] New packages justified
+- [ ] Actively maintained
+- [ ] No known vulnerabilities
+- [ ] Acceptable bundle size impact (frontend)
 
-> For a deeper dependency evaluation, invoke the `evaluating-dependencies` skill on any new packages added in this PR.
+For deeper evaluation, invoke `evaluating-dependencies` on new packages.
 
 ### Architecture
-- [ ] Fits existing patterns (or has good reason not to)
+- [ ] Fits existing patterns
 - [ ] No breaking changes without migration
 - [ ] Avoids unnecessary coupling
-- [ ] Database migrations are safe: non-destructive, backwards-compatible while old code may still run (avoid column renames/drops without a transition period, ensure nullable or defaulted new columns)
+- [ ] DB migrations safe: non-destructive, backwards-compatible, nullable/defaulted new columns
 
 ## Step 3: Follow Up
 
-After presenting the review, ask if the user wants to:
-- **Discuss** any findings or ask questions about the PR
-- **Fix** any of the issues found (apply changes directly)
-- **Post** the review as a PR comment (draft first, wait for approval)
-- **Switch back** to `{original_branch}` when done
+After presenting the review, offer to:
+- **Discuss** findings
+- **Fix** issues directly
+- **Post** as PR comment (draft first, wait for approval)
+- **Switch back** to `{original_branch}`
 
-Stay on the reviewed branch until the user is finished. When they're ready to move on:
+When done:
 ```text
 git checkout "$original_branch"
 [ "$stashed" = "true" ] && git stash pop
@@ -334,119 +268,44 @@ git checkout "$original_branch"
 
 ## Output Format
 
-Structure your review like this (see [references/review-template.md](references/review-template.md) for detailed examples):
+See [references/review-template.md](references/review-template.md) for detailed examples.
 
 - **Summary:** One line verdict (Good to merge / Has issues / Needs work)
-- **PR Quality:** Evaluate title, description, screenshots (review this first)
-- **Existing Discussion:** Respond to active comment threads — agree, disagree, or add context (PR URL only)
-- **Critical:** Security, data loss, crashes - must fix before merge
-- **Important:** Bugs, performance, missing tests - should fix
-- **Minor:** Quality improvements - nice to have
-- **Questions:** Things to clarify with the author
-- **Prevent This:** Suggest tooling/config to catch these issues automatically in the future
-- **Positive Notes:** Briefly acknowledge what's done well
+- **PR Quality:** Title, description, screenshots (PR URL only)
+- **Existing Discussion:** Respond to active threads (PR URL only)
+- **Critical:** Security, data loss, crashes
+- **Important:** Bugs, performance, missing tests
+- **Minor:** Quality improvements
+- **Questions:** Clarifications needed
+- **Prevent This:** Tooling/config to catch these automatically
+- **Positive Notes:** What's done well (brief)
 
 ## Guidelines
 
-- **Read project guidelines first** — CLAUDE.md, AGENT.md, README, docs
-- **Use exact line numbers** from the actual source files, not from diff output. Read the file to confirm line numbers before reporting.
-- **Include deep links when reviewing a PR URL:**
-  - **Azure DevOps:** `https://dev.azure.com/{org}/{project}/_git/{repo}/pullrequest/{id}?path={filePath}&line={start}&lineEnd={end}&lineStartColumn=1&lineEndColumn=1&type=2&lineStyle=plain&_a=files`
-  - **GitHub:** `https://github.com/{owner}/{repo}/pull/{id}/files#diff-{hash}L{line}`
-- Skip style issues that linters catch
-- Explain impact, not just "this is wrong"
-- Consider trade-offs — sometimes simple is better than perfect
-- Briefly note if something is done well, but keep it short
-- **Flag project guideline violations as Important or Critical**
+- Use exact line numbers from source files, not diff output. Read files to confirm.
+- Deep links for PR URL reviews:
+  - Azure DevOps: `https://dev.azure.com/{org}/{project}/_git/{repo}/pullrequest/{id}?path={filePath}&line={start}&lineEnd={end}&lineStartColumn=1&lineEndColumn=1&type=2&lineStyle=plain&_a=files`
+  - GitHub: `https://github.com/{owner}/{repo}/pull/{id}/files#diff-{hash}L{line}`
+- Explain impact, not just "this is wrong".
+- Flag project guideline violations as Important or Critical with the source quoted.
+- For mitigation suggestions, see [references/review-template.md](references/review-template.md#suggesting-future-mitigations).
 
-### Checking Project Guidelines
-
-**How to flag guideline violations:**
+**Guideline violation format:**
 ```markdown
 ### Important
 
 **3. Violates project guideline**
 **File:** `app.vue:28`
-**Source:** CLAUDE.md — "Never cast types - always narrow them"
-**Current:**
-\`\`\`typescript
-const redirect = content.entry.item as IRedirect
-\`\`\`
-**Issue:** Type assertion bypasses TypeScript safety checks
+**Source:** CLAUDE.md - "Never cast types - always narrow them"
+**Issue:** Type assertion bypasses TypeScript safety
 **Fix:** Use discriminated union or type guard
 ```
 
-### Evaluating PR Quality
-
-**Title:**
-- ❌ Bad: "fix", "update", "changes", "wip"
-- ✅ Good: "Fix OAuth redirect loop in Safari", "Add rate limiting to auth endpoints"
-
-**Description:**
-- Should explain WHY, not just list what changed (diff shows that)
-- Complex logic needs context: "Chose X over Y because..."
-- Breaking changes must be highlighted
-- For UI changes: screenshots/videos are expected
-- Link related issues (GitHub): "Fixes #123", "Related to #456"
-- Link work items (Azure DevOps): Should have appropriate work items linked
-
-**Work Items (Azure DevOps only):**
-- PRs should link to relevant work items (User Stories, Bugs, Tasks)
-- Bug fixes → should link to Bug work item
-- Features → should link to User Story or Feature work item
-- No work items linked → ask if one should be created/linked
-- Wrong work item type → suggest appropriate type
-
-**When to ask for improvements:**
-- Title is vague or uninformative
-- No description on non-trivial changes
-- UI changes without screenshots
-- Breaking changes not called out
-- Missing context on non-obvious decisions
-- No work items linked (Azure DevOps) when they should be
-
-**Example feedback:**
-```
-## PR Quality
-
-**Title:** ⚠️ Too generic. Consider: "Fix race condition in payment processing"
-
-**Description:** ❌ Missing context. Why did we switch from polling to SSE? What problem did it solve? Add:
-- What was broken/slow before
-- Why this approach vs alternatives
-- Performance impact (if relevant)
-
-**Screenshots:** ❌ This changes the checkout UI but has no screenshots. Add before/after screenshots.
-```
-
-### Suggesting Future Mitigations
-
-Only suggest mitigations for recurring patterns or critical issues. Don't suggest tools for one-off mistakes. Focus on automatable checks, not process changes.
-
-**TypeScript configuration:**
-- Type safety issues (`any`, implicit types) → Suggest `strict: true`, `noImplicitAny`, `strictNullChecks` in tsconfig.json
-- Missing null checks → Suggest `strictNullChecks: true`
-
-**Linting rules:**
-- Code quality patterns ESLint could catch → Suggest specific ESLint rules
-- Framework-specific issues → Suggest framework ESLint plugins (react-hooks, vue, etc.)
-- Formatting inconsistencies → Suggest Prettier in pre-commit hook
-
-**Pre-commit hooks:**
-- Secrets/credentials committed → Suggest trufflehog or git-secrets
-- Test failures → Suggest running tests before commit
-- Type errors → Suggest tsc --noEmit check
-
-**CI/CD checks:**
-- Security vulnerabilities → Suggest npm audit / dependency scanning
-- Missing tests → Suggest coverage thresholds
-- Build errors → Ensure build runs in CI
-
 ## References
 
-- **[Review Template](references/review-template.md)** - Output structure with severity categories and example issues
-- **[General Issues](references/issues-general.md)** - Security, logic bugs, code quality, DB migrations (always loaded)
-- **[TypeScript Issues](references/issues-typescript.md)** - Type safety, TS/JS patterns, error handling, UI/accessibility, testing
-- **[.NET Issues](references/issues-dotnet.md)** - C#/.NET patterns, Entity Framework, async pitfalls
+- **[Review Template](references/review-template.md)** - Output structure, examples, PR quality evaluation, mitigation suggestions
+- **[General Issues](references/issues-general.md)** - Security, logic bugs, code quality, DB migrations (always load)
+- **[TypeScript Issues](references/issues-typescript.md)** - Type safety, TS/JS patterns, UI/accessibility
+- **[.NET Issues](references/issues-dotnet.md)** - C#/.NET patterns, Entity Framework, async
 - **[Go Issues](references/issues-go.md)** - Error handling, concurrency, naming, performance
-- **[Rust Issues](references/issues-rust.md)** - Unsafe, ownership, serde, async/tokio, integer overflow, defensive patterns
+- **[Rust Issues](references/issues-rust.md)** - Unsafe, ownership, serde, async/tokio, integer overflow

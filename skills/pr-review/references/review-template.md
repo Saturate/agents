@@ -353,3 +353,37 @@ When PR is well documented:
 - Bug #1234 "Race condition in payment processing" - appropriate for this fix
 - Includes reproduction steps and customer impact in work item
 ```
+
+---
+
+## Evaluating PR Quality
+
+**Title:**
+- Bad: "fix", "update", "changes", "wip"
+- Good: "Fix OAuth redirect loop in Safari", "Add rate limiting to auth endpoints"
+
+**Description:** Should explain WHY, not just WHAT. Complex logic needs context. Breaking changes must be highlighted. UI changes need screenshots. Link issues (GitHub) or work items (Azure DevOps).
+
+**Work Items (Azure DevOps only):**
+- Bug fixes → Bug work item. Features → User Story or Feature.
+- No work items → ask if one should be created/linked.
+
+**Flag when:** title is vague, no description on non-trivial changes, UI changes without screenshots, breaking changes not called out, no work items linked (Azure DevOps).
+
+---
+
+## Suggesting Future Mitigations
+
+Only suggest mitigations for recurring patterns or critical issues. Focus on automatable checks.
+
+| Pattern | Mitigation |
+|---|---|
+| Type safety issues (`any`, implicit types) | `strict: true`, `noImplicitAny`, `strictNullChecks` in tsconfig |
+| Missing null checks | `strictNullChecks: true` |
+| Lint-catchable quality issues | Specific ESLint rules or framework plugins |
+| Formatting inconsistencies | Prettier in pre-commit hook |
+| Secrets/credentials committed | trufflehog or git-secrets |
+| Test failures reaching review | Tests in pre-commit hook |
+| Type errors reaching review | `tsc --noEmit` in pre-commit or CI |
+| Dependency vulnerabilities | `npm audit` / dependency scanning in CI |
+| Missing test coverage | Coverage thresholds in CI |
