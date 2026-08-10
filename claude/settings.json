@@ -262,6 +262,7 @@
       }
     }
   },
+  "cleanupPeriodDays": 365000,
   "skipDangerousModePermissionPrompt": true,
   "remoteControlAtStartup": true,
   "agentPushNotifEnabled": true
