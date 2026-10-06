@@ -1,6 +1,6 @@
 ---
 name: plan
-description: Break work into small verifiable tasks with acceptance criteria and dependency ordering. Produces tasks/plan.md.
+description: Break work into small verifiable tasks with acceptance criteria and dependency ordering. Produces plan.md next to the spec, outside the repo.
 user-invocable: true
 allowed-tools: Read Grep Glob Bash
 metadata:
@@ -14,7 +14,7 @@ Decompose work into small, verifiable tasks. Each task should be completable in 
 
 ## Prerequisites
 
-Read the spec (`SPEC.md`, `docs/SPEC.md`, or a file under `spec/`) and the relevant codebase sections before planning. If no spec exists, stop and ask the user to run `/spec` first.
+Resolve `$dir` as described in the `spec` skill ("Where specs live"). Archive merged features (spec skill, "Archiving merged work"), then list `~/.claude/specs/$repo/` excluding `done/`: one feature folder means use it; several means ask the user which one (suggest the one matching the current branch name if any). Read `$dir/SPEC.md` and the relevant codebase sections before planning. If no spec exists, stop and ask the user to run `/spec` first.
 
 ## Process
 
@@ -105,7 +105,7 @@ Add explicit checkpoints:
 
 ### 6. Save and present
 
-Save to `tasks/plan.md`. Present the plan for human review.
+Save to `$dir/plan.md`, never inside the repo. Tell the user the path and present the plan for human review.
 
 Do not begin implementation until the human has explicitly approved the plan.
 

@@ -17,8 +17,8 @@ This project ships workflow skills (*how to approach a type of work*) and action
 Task arrives
   │
   ├── Vague idea, fuzzy goal ─────────────────→ idea-refine
-  ├── Need a spec before building ────────────→ /spec  (produces SPEC.md)
-  ├── Need a plan from a spec ────────────────→ /plan  (produces tasks/plan.md)
+  ├── Need a spec before building ────────────→ /spec  (produces SPEC.md, outside repo)
+  ├── Need a plan from a spec ────────────────→ /plan  (produces plan.md, outside repo)
   ├── About to plan non-trivial work ─────────→ pre-planning
   │
   ├── Implementing something ─────────────────→ /build  (or: incremental-implementation)
@@ -102,9 +102,9 @@ A task isn't done until there's evidence — passing tests, build output, runtim
 | Phase | Skill / Command | One-line |
 |---|---|---|
 | Define | idea-refine | Sharpen vague ideas |
-| Define | `/spec` | Write structured spec, produce SPEC.md |
+| Define | `/spec` | Write structured spec to ~/.claude/specs/<repo>/<slug>/SPEC.md |
 | Define | pre-planning | Gather context before planning |
-| Plan | `/plan` | Break spec into tasks, produce tasks/plan.md |
+| Plan | `/plan` | Break spec into tasks, save plan.md next to the spec |
 | Build | `/build` | Implement next task (one slice) |
 | Build | `/build auto` | Implement the whole plan in one approved pass |
 | Build | incremental-implementation | Vertical slices, verify each |

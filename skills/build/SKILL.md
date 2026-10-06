@@ -19,18 +19,19 @@ Invoke the `incremental-implementation` skill alongside `tdd`.
 
 ## Default: one task
 
-A plan (`tasks/plan.md`) must exist. If none exists, stop and ask the user to run `/plan` first.
+Resolve `$dir` as described in the `spec` skill ("Where specs live"). Archive merged features (spec skill, "Archiving merged work"), then list `~/.claude/specs/$repo/` excluding `done/`: one feature folder means use it; several means ask the user which one (suggest the one matching the current branch name if any). A plan (`$dir/plan.md`) must exist. If none exists, stop and ask the user to run `/plan` first.
 
-Pick the next pending task from `tasks/plan.md`. Then:
+Pick the next pending task from `$dir/plan.md`. Then:
 
-1. Read the task's acceptance criteria
-2. Load relevant context (existing code, patterns, types)
-3. Write a failing test for the expected behavior (RED)
-4. Implement the minimum code to pass the test (GREEN)
-5. Run the full test suite to check for regressions
-6. Run the build to verify compilation
-7. Commit with a descriptive message (invoke the `commit` skill)
-8. Mark the task complete and stop
+1. If `$dir/BRANCH` doesn't exist, write the current branch name to it (used to archive the folder after merge)
+2. Read the task's acceptance criteria
+3. Load relevant context (existing code, patterns, types)
+4. Write a failing test for the expected behavior (RED)
+5. Implement the minimum code to pass the test (GREEN)
+6. Run the full test suite to check for regressions
+7. Run the build to verify compilation
+8. Commit with a descriptive message (invoke the `commit` skill)
+9. Mark the task complete and stop
 
 ## Autonomous: the whole plan (`/build auto`)
 
@@ -38,27 +39,25 @@ Removes the manual stepping between tasks, **not** the verification. Every task 
 
 ### 1. Require a spec
 
-Look for a spec at a known path: `SPEC.md` at the repo root, `docs/SPEC.md`, or a file under `spec/`. A README or arbitrary doc does **not** count. If none exists, stop and ask the user to run `/spec` first. Do not invent requirements.
+Resolve `$dir` as in the default mode and look for `$dir/SPEC.md`. A README or arbitrary doc in the repo does **not** count. If none exists, stop and ask the user to run `/spec` first. Do not invent requirements.
 
 ### 2. Establish a clean baseline
 
-Run `git status --porcelain`. If there are uncommitted changes outside the expected planning artifacts (`SPEC.md`, `docs/SPEC.md`, `spec/*`, `tasks/plan.md`, `tasks/todo.md`), stop and ask the user to commit, stash, or confirm how to handle them. Autonomous per-task commits must not absorb unrelated local work, or the clean-rollback guarantee breaks.
+Run `git status --porcelain`. If there are any uncommitted changes, stop and ask the user to commit, stash, or confirm how to handle them. Autonomous per-task commits must not absorb unrelated local work, or the clean-rollback guarantee breaks.
 
 ### 3. Plan if needed
 
-If there is no `tasks/plan.md`, invoke the `/plan` workflow to generate one.
+If there is no `$dir/plan.md`, invoke the `/plan` workflow to generate one.
 
 ### 4. Single checkpoint
 
 Present the full plan and wait for an unambiguous affirmative (e.g. "approve", "go", "yes"). Treat hedged responses ("looks reasonable", "I guess") as **not** approved. This is the only human gate; after approval, run autonomously.
 
-If you generated `tasks/plan.md`, commit it as a single preparatory commit now so it doesn't bleed into the first task's commit.
-
 ### 5. Execute every task in dependency order
 
 Use each task's declared dependencies; if not explicit, execute in the order the plan lists them. For each task, run the full default loop above (RED, GREEN, regression, build, commit, mark complete).
 
-Stage only the files that task touched plus its task-status update. Never `git add -A` blindly. Make one commit per task so any point is a clean rollback.
+Stage only the files that task touched. Task-status updates go to `$dir/plan.md`, which is outside the repo and never staged. Never `git add -A` blindly. Make one commit per task so any point is a clean rollback.
 
 ### 6. Stop and ask the user (do not push through) when
 

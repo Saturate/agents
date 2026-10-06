@@ -1,6 +1,6 @@
 ---
 name: spec
-description: Write a structured specification before writing code. Produces SPEC.md.
+description: Write a structured specification before writing code. Produces SPEC.md outside the repo.
 user-invocable: true
 allowed-tools: Read Grep Glob Bash
 metadata:
@@ -15,6 +15,28 @@ Write a structured spec before any code. The spec is the shared source of truth;
 ## When to skip
 
 Single-file fixes, config changes, or tasks where requirements are unambiguous and self-contained. Note: `/build auto` requires a spec, so always run `/spec` before autonomous multi-task builds.
+
+## Where specs live
+
+Specs and plans are working notes, not project files. They live outside the repo so they never get committed:
+
+```bash
+repo=$(basename "$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")")
+dir="$HOME/.claude/specs/$repo/<feature-slug>"   # SPEC.md and plan.md go here
+```
+
+`--git-common-dir` resolves to the main checkout, so every worktree of the repo shares the same specs. `<feature-slug>` is a short kebab-case name for the feature (e.g. `oauth-login`). Never write `SPEC.md`, `tasks/plan.md` or similar into the working tree.
+
+`/build` records the feature branch in `$dir/BRANCH` (one line, the branch name) when it starts the first task.
+
+### Archiving merged work
+
+Whenever a skill lists `~/.claude/specs/$repo/` to pick a feature folder, first archive the finished ones. For each folder with a `BRANCH` file, check whether that branch's PR is merged:
+
+- GitHub: `gh pr list --head <branch> --state merged --json number`
+- Azure DevOps: `az repos pr list --source-branch <branch> --status completed`
+
+Squash merges hide the branch from `git branch --merged`, so ask the platform instead of git. If the PR is merged, move the folder to `~/.claude/specs/$repo/done/<feature-slug>/` and say so. If the check fails (no CLI, offline, no PR yet), leave the folder alone. Folders under `done/` are never picked as the active feature.
 
 ## Process
 
@@ -52,7 +74,7 @@ STACK DETECTED:
 
 ### 4. Write the spec
 
-Create `SPEC.md` at the project root covering these six areas:
+Pick a feature slug, then create `$dir/SPEC.md` (see "Where specs live") covering these six areas:
 
 ```markdown
 # Spec: [Project/Feature Name]
@@ -110,11 +132,11 @@ SUCCESS CRITERIA:
 
 Present the spec for review. Do not proceed to planning or implementation until the human has explicitly approved it. "Sounds good" is not approval; ask "anything you'd change?"
 
-Commit `SPEC.md` to version control once approved.
+Tell the user the full path of the saved spec.
 
 ## Rules
 
-1. **The spec is a living document.** Update when decisions or scope change. Commit updates alongside code.
+1. **The spec is a living document.** Update it when decisions or scope change. It stays out of git.
 2. **Don't invent requirements.** If the spec doesn't cover something, stop and ask. Surface it in Open Questions.
 3. **When docs conflict with existing code**, surface the conflict with options. Don't silently pick one.
-4. **Reference the spec in PRs.** Link back to the section each PR implements.
+4. **Use the spec in PRs.** Explain the relevant requirements in the PR description itself; the spec file is local, so a link to it means nothing to reviewers.
