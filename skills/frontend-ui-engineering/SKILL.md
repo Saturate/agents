@@ -4,7 +4,7 @@ description: Guides frontend UI development with component hierarchy, separation
 allowed-tools: Read Grep Glob Bash
 metadata:
   author: Saturate
-  version: "1.0"
+  version: "1.1"
 ---
 
 # Frontend UI Engineering
@@ -97,6 +97,7 @@ Be conscious of what you ship:
 - **Avoid unnecessary re-renders**: memoize expensive computations, stable references for callbacks/objects in props
 - **Monitor bundle size**: importing a whole library for one function is expensive
 - **Virtualize long lists**: don't render 1000 DOM nodes when 20 are visible
+- **Next.js: use `<Link>` not `<a>`** for internal routes. Raw `<a>` causes full page reloads, losing client state and SPA navigation. External links and `#anchors` are fine as `<a>`.
 
 ## Step 6: Verify
 

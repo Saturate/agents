@@ -4,7 +4,7 @@ description: Performs self-review during development by checking changed code fo
 allowed-tools: Read Grep Glob Bash
 metadata:
   author: Saturate
-  version: "1.0"
+  version: "1.1"
 ---
 
 # Code Review
@@ -46,6 +46,7 @@ Check changed files to determine which review patterns apply:
 Load relevant issue references:
 - `../pr-review/references/issues-general.md` - Always
 - `../pr-review/references/issues-typescript.md` - If TS/JS files changed
+- `../pr-review/references/issues-nextjs.md` - If `next` is in the dependencies of the nearest `package.json` to any changed file
 - `../pr-review/references/issues-dotnet.md` - If .NET files changed
 - `../pr-review/references/issues-go.md` - If Go files changed
 

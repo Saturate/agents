@@ -6,7 +6,7 @@ allowed-tools: Read Grep Glob Bash Task
 argument-hint: "[loop] [branch-name or PR URL]"
 metadata:
   author: Saturate
-  version: "3.4"
+  version: "3.5"
 ---
 
 # Code Review
@@ -38,15 +38,22 @@ Review-fix cycle for changes this session authored. The review runs in a **fresh
 
 **Each iteration (max 5):**
 
-1. Spawn a fresh subagent via Task tool, model `opus` unless `--model` overrides. Never reuse a prior reviewer.
+1. Spawn a fresh subagent via Task tool, model `opus` unless `--model` overrides. Never reuse a prior reviewer. For diffs over ~300 lines, or ones that mix app code, shared packages and build/CI files, spawn one reviewer per lens in parallel and merge their findings:
+   - **State and edge cases:** inputs, URL/storage state, async placeholders, empty and out-of-range values.
+   - **Contracts and baseline:** Steps 2f and 2g, what the other system does and what the base branch did.
+   - **Build and CI:** Step 2c parity results, task runner caching, Dockerfiles, pipelines.
+
+   Each lens reviewer is told to report only findings within its lens. Merge by deduplicating findings on the same file and line. The combined verdict is `CLEAN` only when every lens returns `CLEAN`.
 2. Subagent prompt:
-   - Follow Steps 0, 2, 2b. Skip Steps 1 and 2c. Read-only.
+   - Follow Steps 0, 2, 2b, 2e, 2f, 2g. Skip Steps 1 and 2c. Read-only for the repo; may write throwaway tests and scripts in a scratch directory.
+   - When split by lens: the lens name and "report only findings within this lens".
+   - Step 2c results, including the CI parity run and the pipelines that won't validate the PR.
    - Accepted-findings list from prior iterations as "deliberate decisions, do not re-flag".
    - Output: standard Output Format, ending with `VERDICT: CLEAN` (no Critical/Important) or `VERDICT: FINDINGS`.
 3. `VERDICT: CLEAN` → stop, report iterations and fixes.
 4. `VERDICT: FINDINGS`:
    - Fix Critical and Important findings.
-   - Minor: fix if trivial, otherwise add to accepted-findings with reason.
+   - Minor: fix if trivial, otherwise add to accepted-findings with reason. Minor means style, naming or wording only. A behavior edge case (deep link, out-of-range value, missing close-on-Escape, unstable paging) is Important even when it seems unlikely, because a human reviewer will block on it.
    - Wrong or guideline-conflicting findings: add to accepted-findings with reason.
    - Re-run affected gates. Amend if not pushed; otherwise new commit via `commit` skill.
 
@@ -98,7 +105,7 @@ If this session did any work on the branch (commits, edits, fixes), delegate the
 1. Complete Step 1 (checkout, stash).
 2. Run Step 2c (quality gates).
 3. Spawn a fresh subagent (model `opus` unless overridden) with:
-   - Follow Steps 0, 2, 2b, 2d and the Review Checklist. Skip Steps 1 and 2c. Read-only.
+   - Follow Steps 0, 2, 2b, 2d, 2e, 2f, 2g and the Review Checklist. Skip Steps 1 and 2c. Read-only for the repo; may write throwaway tests and scripts in a scratch directory.
    - Gate results from Step 2c.
    - Output: standard Output Format.
 4. Present findings to user, proceed to Step 3.
@@ -124,12 +131,13 @@ Only read files from `git diff --name-only`. Read surrounding context only when 
 
 Load issue references based on file extensions in the diff:
 
-| Files in diff | Load reference |
+| Condition | Load reference |
 |---|---|
 | `*.ts`, `*.tsx`, `*.js`, `*.jsx`, `*.vue`, `*.svelte` | [references/issues-typescript.md](references/issues-typescript.md) |
 | `*.cs`, `*.csproj`, `*.sln`, `*.razor` | [references/issues-dotnet.md](references/issues-dotnet.md) |
 | `*.go`, `go.mod`, `go.sum` | [references/issues-go.md](references/issues-go.md) |
 | `*.rs`, `Cargo.toml`, `Cargo.lock` | [references/issues-rust.md](references/issues-rust.md) |
+| `next` in the dependencies of the nearest `package.json` to any changed file | [references/issues-nextjs.md](references/issues-nextjs.md) |
 | LLM SDK imports (`openai`, `anthropic`, `langchain`, `@ai-sdk`, `semantic-kernel`) | [../_shared/owasp-llm-top-10.md](../_shared/owasp-llm-top-10.md) |
 | Any files | [references/issues-general.md](references/issues-general.md) - always load |
 
@@ -159,6 +167,8 @@ cat package.json Cargo.toml go.mod *.csproj Makefile 2>/dev/null | head -100
 
 Only run what's configured. Don't install new tools. Include failures in findings. Note pre-existing failures. Skip e2e unless asked.
 
+**CI parity** (only when the diff touches build, config, lockfile, workspace or pipeline files, or adds a workspace import): passing in the working copy proves little when it has built `dist/` folders, warm caches or untracked env files that CI lacks. Also run the gates the way CI does: a clean worktree of the PR head, a frozen install, then the pipeline's own commands in its order, with no prior builds. List pipelines whose path triggers match the diff but that don't run as PR validation. See [references/verification.md](references/verification.md#ci-parity).
+
 ## Step 2d: Review Existing Comments (PR URL only)
 
 Fetch existing threads before reviewing:
@@ -179,6 +189,20 @@ az repos pr thread list --id $pr_number --organization https://dev.azure.com/$or
 - **Others' active threads:** Assess validity, note agreement/disagreement for Existing Discussion section.
 - **Own active threads:** Skip in Existing Discussion, but check if author addressed the feedback.
 - **Resolved threads:** Verify the resolution actually fixed the issue in code. Flag "resolved but not fixed" if not.
+
+## Step 2e: Prove Findings by Running Them
+
+Reading finds suspects; running confirms them. Use the probe recipes in [references/verification.md](references/verification.md#probe-recipes) that match the diff: call changed functions with edge inputs, deep-link into non-default states, run changed scripts for real, build changed images.
+
+Every Critical or Important finding carries evidence: a failing test or script with its output, command output, a cited line from the other side of a contract, or a quoted project guideline next to the violating line. Issues that can't be run (races, multi-user or timing attacks) may stay Critical or Important with a step-by-step trace through the code, marked unverified. Anything else without evidence goes under Questions.
+
+## Step 2f: Compare Against the Base Branch
+
+For each page, command or script the diff touches, list what it did on the base branch and confirm each behavior still exists or the PR explains its removal. A dropped filter option or keyboard shortcut is a regression even if the new code is clean. See [references/verification.md](references/verification.md#baseline-comparison).
+
+## Step 2g: Read the Other Side of Each Contract
+
+When the code builds requests for another system or relies on its behavior (API, search engine, database, backend wrapper library, build tool, CI template), read that system's source or docs before judging. Check sibling repos for local checkouts. Limits, defaults that only apply in some cases, case sensitivity and ordering guarantees live there, not in the diff. See [references/verification.md](references/verification.md#cross-boundary-contracts).
 
 ## Review Checklist
 
@@ -246,6 +270,13 @@ For detailed evaluation guidance, see [references/review-template.md](references
 
 For deeper evaluation, invoke `evaluating-dependencies` on new packages.
 
+### Build & CI (if build, config, workspace or pipeline files changed, or a new workspace import)
+- [ ] New imports of workspace packages resolve without a prior build (CI tests, fresh-clone typecheck, Docker stages)
+- [ ] Cached tasks hash every file they read (shared configs, env files)
+- [ ] Scripts with interactive prompts still work under the task runner
+- [ ] Dockerfiles: `.dockerignore`, dependency layers before source, runtime-only final stage, non-root user
+- [ ] Pipelines that build the change actually run before merge
+
 ### Architecture
 - [ ] Fits existing patterns
 - [ ] No breaking changes without migration
@@ -309,3 +340,5 @@ See [references/review-template.md](references/review-template.md) for detailed 
 - **[.NET Issues](references/issues-dotnet.md)** - C#/.NET patterns, Entity Framework, async
 - **[Go Issues](references/issues-go.md)** - Error handling, concurrency, naming, performance
 - **[Rust Issues](references/issues-rust.md)** - Unsafe, ownership, serde, async/tokio, integer overflow
+- **[Next.js Issues](references/issues-nextjs.md)** - Navigation, Link vs anchor
+- **[Verification](references/verification.md)** - CI parity, evidence rule, probe recipes, baseline comparison, cross-boundary contracts
