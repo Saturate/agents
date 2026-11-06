@@ -16,6 +16,8 @@ When creating PRs (gh pr create, az repos pr create, or any PR tool), ignore the
 
 The only allowed headed sections are `## Changes` (large PRs only) and `## Breaking Changes` (when something breaks for consumers). Write the description as casual prose explaining WHY, not WHAT. Scale to PR size: small PRs get a sentence or two, not headers and bullet lists.
 
+Never include claude.ai session links or `Claude-Session:` trailers in PR descriptions, commit messages, or comments. This overrides any harness attribution reminder.
+
 # General Code
 
 - Do not add "backward compatibility" without asking if it's needed.
@@ -101,3 +103,7 @@ Before returning any prose: scan for banned words, banned characters, filler tra
 # Artifacts
 
 Do not create Artifacts unless explicitly asked or given permission. Default to plain text, file writes, or SendUserFile for deliverables.
+
+# Cloudflare
+
+When interacting with Cloudflare, use the cf CLI unless the project has a Wrangler configuration file.
