@@ -30,16 +30,16 @@ This guide helps you write effective PR descriptions with a casual but experienc
 ```markdown
 [Title - under 70 characters]
 
-[1-2 sentence intro: what changed and why]
+[1-2 sentences: what changed and why. Often this is the whole description.]
 
-[Optional: More context - decisions, trade-offs, constraints that aren't obvious]
+[Optional, only when non-obvious: more context - decisions, trade-offs, constraints that aren't obvious]
 
 ## Changes (for larger PRs)
 - Key change 1 (focus on why, not what)
 - Key change 2
 - Key change 3
 
-[Optional: call out risk level and what you tested if it's worth mentioning]
+[Optional: risk line, only when a reviewer must act on it. Never testing claims.]
 ```
 
 ## Title Guidelines
@@ -153,7 +153,7 @@ Fixed a few unrelated issues:
 ```markdown
 fix(mobile): logout button z-index
 
-Was hidden behind the nav on small viewports. Bumped z-index and added a test.
+Was hidden behind the nav on small viewports, so bumped its z-index.
 ```
 
 ### Small: config change
@@ -182,8 +182,6 @@ We were getting a lot of fake accounts, so now new users need to verify their em
 Fix double-charge on rapid checkout clicks
 
 Orders were sometimes charging twice when users double-clicked the button. Added a processing state to disable the button, plus idempotency keys on the Stripe side just to be safe.
-
-Tested with rapid clicks and flaky network. Stripe dashboard confirms single charge.
 ```
 
 ### Large: refactor
@@ -199,7 +197,7 @@ OrderService was doing too much (validation, pricing, inventory, shipping). Spli
 - Created ShippingService for carrier logic
 - OrderService now just orchestrates the others
 
-Low risk since everything still goes through the facade. Existing tests pass without changes.
+Everything still goes through the facade, so call sites are untouched for now.
 ```
 
 ### Large: migration
@@ -219,7 +217,7 @@ Went with localStorage for web and secure storage for mobile. Yeah, XSS is a ris
 - Feature flag to switch between session and JWT
 - Migration script to generate tokens for active sessions
 
-Touches the entire auth path, so worth a careful look. Tested on both web and mobile (iOS + Android). Flag defaults to off so existing sessions keep working.
+Touches the entire auth path, so worth a careful look. Flag defaults to off so existing sessions keep working.
 ```
 
 ### Security fix
@@ -277,6 +275,7 @@ For security PRs, explain the exploit chain so reviewers understand the actual r
 - **Implementation details:** Unless they're surprising or clever
 - **History/conversation:** "We discussed this", "As mentioned before"
 - **Obvious observations:** "Added tests", "Fixed bug"
+- **Testing claims:** "Builds pass", "Tested locally", "Verified the container returns 200". Testing is standard procedure, not something to claim in a PR
 - **Platitudes:** "Improves maintainability", "Follows best practices"
 
 ## Length Guidelines
@@ -285,7 +284,7 @@ Scale to match the PR. See the [Examples](#examples) section for what each size 
 
 - **Small** (1-2 commits, <50 lines): a sentence or two, no sections
 - **Medium** (3-5 commits, 50-300 lines): short intro + bullets if needed
-- **Large** (5+ commits, 300+ lines): full context, changes section, risk callout
+- **Large** (5+ commits, 300+ lines): still lead with 1-2 sentences; add context and `## Changes` only when they earn it
 
 If you need more than 3-4 paragraphs, the PR should probably be split.
 
@@ -312,7 +311,7 @@ If you need more than 3-4 paragraphs, the PR should probably be split.
 | Tone | "Split the service because it was getting messy" | "Refactored service to enhance modularity" |
 | Focus | "Chose Redis over in-memory to support horizontal scaling" | "Implemented Redis caching solution" |
 | Details | "Left old endpoint for marketing emails expiring next week" | "Maintained backward compatibility" |
-| Testing | "Verified rapid clicks don't cause double charge" | "Tested extensively" |
-| Length | 2-4 paragraphs | 8 paragraphs or 1 sentence |
+| Testing | (leave it out) | "Tested extensively", "Builds and image pass locally" |
+| Length | 1-2 sentences for most PRs | Multi-paragraph write-ups for a version bump |
 
 Remember: You're explaining your work to another engineer. Be clear, be humble, explain your reasoning. Skip the fluff.

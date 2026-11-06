@@ -5,7 +5,7 @@ compatibility: Requires git repository, gh CLI for GitHub or az CLI + azure-devo
 allowed-tools: Bash
 metadata:
   author: Saturate
-  version: "2.1"
+  version: "2.2"
 ---
 
 You are helping the user create a pull request on GitHub or Azure DevOps. Follow these steps:
@@ -324,17 +324,23 @@ No other `##` sections. Period.
 
 #### Templates by size
 
+Default for every size: one or two sentences saying what changed and why. Only go longer when a reviewer needs context they can't get from the diff.
+
 **Small PR (1-2 commits, <50 lines changed):**
 
 One or two sentences. No sections, no bullets, no headings.
 
 ```
-The logout button was hidden behind the nav on small screens. Bumped the z-index and added a viewport test.
+The logout button was hidden behind the nav on small screens, so bumped its z-index.
+```
+
+```
+Bumps pnpm from 9 to 12 so main builds can report the web app's SBOM to Dependency-Track with `pnpm sbom`.
 ```
 
 **Medium PR (3-5 commits, 50-300 lines):**
 
-Short intro paragraph + bullet points if it helps. No headed sections.
+One or two sentences, plus bullets only when they carry a why the sentence can't. No headed sections.
 
 ```
 Switched from polling to SSE for notifications because polling was hammering the DB during peak hours.
@@ -346,14 +352,14 @@ Switched from polling to SSE for notifications because polling was hammering the
 
 **Large PR (5+ commits, 300+ lines):**
 
-Intro + optional context paragraph. `## Changes` only when the PR spans unrelated areas and grouping by intent helps reviewers understand why things are bundled. Never list files or directories; the diff view does that.
+One or two sentences, plus a context paragraph only for non-obvious choices or gotchas. `## Changes` only when the PR spans unrelated areas and grouping by intent helps reviewers understand why things are bundled. Never list files or directories; the diff view does that.
 
 ```
 [What changed and why, 1-2 sentences]
 
-[More context if needed: why this approach, what you considered, any gotchas]
+[Only if needed: why this approach, what you considered, any gotchas]
 
-[Risk callout inline: "touches the payment path" or "low risk, just config"]
+[Risk line only when a reviewer must act on it: "touches the payment path, worth a careful look"]
 ```
 
 With `## Changes` (only when it earns its keep):
@@ -371,9 +377,9 @@ Touches the login path end-to-end, worth a careful look.
 
 #### Extra rules
 
-- **UI changes:** include screenshots or note that they're needed.
-- **Testing:** if something interesting was done for testing, mention it naturally in the description text. Never as a separate section.
-- **Risk:** call out risk areas so reviewers know where to focus, inline in the prose or as the last bullet.
+- **Visual changes:** include before/after screenshots when possible.
+- **Testing:** never claim testing. Builds passing, tests passing, "verified locally", "container returns 200" are standard procedure and just noise in a description. Leave them out entirely.
+- **Risk:** only call out risk when a reviewer has to do something about it (look carefully at a path, coordinate a deploy). Skip "low risk" filler.
 
 #### Analyzing commits for description
 

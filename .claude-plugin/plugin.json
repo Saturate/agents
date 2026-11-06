@@ -1,7 +1,7 @@
 {
   "name": "agents",
   "description": "Skills, plugins, and config for AI coding agents",
-  "version": "1.4.0",
+  "version": "1.4.1",
   "author": {
     "name": "Saturate"
   },
