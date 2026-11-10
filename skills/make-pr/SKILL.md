@@ -503,4 +503,5 @@ The code was already reviewed in Step 3c, so no post-creation review is needed.
 - The skill auto-generates good descriptions, but you can override with `--description`
 - For GitHub, link issues with "Fixes #123" in description
 - For Azure, use `--work-items` to link work items
+- For Azure, reference other PRs with `!123`; `#123` links a work item
 - Generated descriptions are casual and explain why changes were made, not just what changed

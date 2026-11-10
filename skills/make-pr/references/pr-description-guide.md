@@ -300,6 +300,7 @@ If you need more than 3-4 paragraphs, the PR should probably be split.
 ### Azure DevOps
 - Supports Markdown
 - Link work items with `#123` or use `--work-items` flag
+- Reference another pull request with `!123`; `#123` always links a work item, even when the number is a PR
 - Reference commits with full SHA or Azure DevOps work item syntax
 - Use multiple `--description` flags for multi-line descriptions in CLI
 - Each `--description` becomes a new line
