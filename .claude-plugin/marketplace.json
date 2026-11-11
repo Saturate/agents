@@ -20,7 +20,7 @@
       "name": "skill-router",
       "source": "./plugins/skill-router",
       "description": "Injects a skill-routing meta-skill at session start. A hooks module refuses high-signal commands (git commit, gh pr create, npm install, rm -rf, ...) until the matching skill has loaded, and asks the person to approve external or destructive ones.",
-      "version": "4.0.0"
+      "version": "4.0.1"
     },
     {
       "name": "secret-mask",
