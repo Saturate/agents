@@ -8,7 +8,7 @@
       "name": "agents",
       "source": ".",
       "description": "Skills, plugins, and config for AI coding agents",
-      "version": "1.4.1"
+      "version": "1.5.0"
     },
     {
       "name": "observability",
@@ -19,8 +19,8 @@
     {
       "name": "skill-router",
       "source": "./plugins/skill-router",
-      "description": "Injects a skill-routing meta-skill at session start and emits just-in-time skill advisories before high-signal Bash commands (npm install, cargo add, git commit, dotnet add package, etc).",
-      "version": "3.1.0"
+      "description": "Injects a skill-routing meta-skill at session start. A hooks module refuses high-signal commands (git commit, gh pr create, npm install, rm -rf, ...) until the matching skill has loaded, and asks the person to approve external or destructive ones.",
+      "version": "4.0.0"
     },
     {
       "name": "secret-mask",

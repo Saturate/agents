@@ -102,7 +102,6 @@
       "Bash(go doc:*)",
       "Bash(cargo build:*)",
       "Bash(git push:*)",
-      "Bash(SKILL_ACK=*)",
       "Bash(ls:*)",
       "Bash(mkdir:*)",
       "Bash(xargs:*)",

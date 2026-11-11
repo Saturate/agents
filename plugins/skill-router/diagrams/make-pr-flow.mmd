@@ -23,8 +23,8 @@ flowchart TD
         S10["Step 7: Displayed PR URL and details"]
         S9 --> S10
 
-        INV_code-review("/code-review"):::invoke
         INV_make-pr("/make-pr"):::invoke
+        INV_pr-review("/pr-review"):::invoke
     end
 
     style flow fill:#1e1e2e,stroke:#89b4fa,color:#cdd6f4

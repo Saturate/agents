@@ -4,7 +4,7 @@ description: Commits staged changes using Conventional Commits with auto-detecte
 allowed-tools: Bash Read Grep Glob
 metadata:
   author: Saturate
-  version: "1.0"
+  version: "1.1"
 ---
 
 # Commit
@@ -112,13 +112,11 @@ Common types: `feat`, `fix`, `refactor`, `chore`, `docs`, `test`, `perf`, `ci`
 Show the user the proposed commit message. Wait for approval or edits. Then:
 
 ```bash
-SKILL_ACK=$(cat ~/.claude/.skill-nonce):commit git commit -m "$(cat <<'EOF'
+git commit -m "$(cat <<'EOF'
 the commit message here
 EOF
 )"
 ```
-
-The `SKILL_ACK=<nonce>:commit` prefix signals to the skill-advisor hook that this skill has been consulted. The nonce is generated per session and prevents bypassing the skill.
 
 ## Anti-Patterns
 

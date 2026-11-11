@@ -4,7 +4,7 @@ description: "Runs project quality gates before pushing. Auto-detects lint, form
 allowed-tools: Bash Read
 metadata:
   author: Saturate
-  version: "1.1"
+  version: "1.2"
 ---
 
 # Push
@@ -189,25 +189,17 @@ This keeps all gate-related fixes in the existing commit instead of creating "fi
 
 ## Step 4: Push
 
-All gates passed. Push with the skill acknowledgment:
+All gates passed. Push:
 
 ```bash
-SKILL_ACK=$(cat ~/.claude/.skill-nonce):push git push origin HEAD
+git push origin HEAD
 ```
 
 If the original command had specific flags (e.g., `-u`, `--set-upstream`, a specific remote), preserve them.
 
 ## Skipping gates
 
-The default is to run all detected gates. To skip specific gates, prefix the push command:
-
-```bash
-SKILL_ACK=$(cat ~/.claude/.skill-nonce):push:skip-tests git push origin HEAD
-SKILL_ACK=$(cat ~/.claude/.skill-nonce):push:skip-build git push origin HEAD
-SKILL_ACK=$(cat ~/.claude/.skill-nonce):push:skip-tests,skip-build git push origin HEAD
-```
-
-Only skip when the user gives a reason (e.g., "just pushing docs, skip tests").
+The default is to run all detected gates. Skip one only when the user gives a reason (e.g., "just pushing docs, skip tests"), and say which gate was skipped.
 
 ## Gate detection summary
 

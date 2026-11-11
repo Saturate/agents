@@ -4,7 +4,7 @@ description: Meta-skill that maps tasks to the right skill. Consult at the start
 user-invocable: true
 metadata:
   author: Saturate
-  version: "3.1"
+  version: "3.2"
 ---
 
 # Skill Router
@@ -65,7 +65,7 @@ Task arrives
 
 1. **Check the router before starting non-trivial work.** Vague prompts default to `idea-refine`. "Build X" without a spec defaults to `/spec` first.
 2. **Workflow skills are chainable.** A typical feature: `/spec` → `/plan` → `/build` → `pr-review loop` → `push` → `make-pr`. The `push` and `make-pr` skills run the review loop themselves when it hasn't already passed on the current HEAD. The full autonomous path: `/spec` → `/build auto`. All paths require explicit human approval before execution; no step auto-deploys or runs destructive operations without sign-off.
-3. **Action skills gate specific tool calls.** Installing a package? `evaluating-dependencies` first. Committing? `commit`. Opening a PR? `make-pr`. These are enforced by the `skill-router` plugin's PreToolUse advisor where it applies — but consult them regardless.
+3. **Action skills gate specific tool calls.** Installing a package? `evaluating-dependencies` first. Committing? `commit`. Opening a PR? `make-pr`. Where the `skill-router` plugin applies, the command is refused until the skill has loaded in the conversation. Consult them regardless.
 4. **Skills are not suggestions.** When a skill applies, follow its steps in order. Skipping the verification step of a workflow skill is the same as not running it.
 5. **When multiple apply, run them in sequence.** Example: a UI feature → `pre-planning` → `frontend-ui-engineering` → `incremental-implementation` → `tdd` → `pr-review`.
 

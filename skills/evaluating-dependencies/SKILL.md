@@ -5,7 +5,7 @@ user-invocable: true
 allowed-tools: Bash WebFetch WebSearch Read Grep
 metadata:
   author: Saturate
-  version: "2.0"
+  version: "2.1"
 ---
 
 # Evaluating Dependencies
@@ -158,13 +158,11 @@ npx npq install <pkg>             # sanity-checker
 **Install (pinned):**
 
 ```bash
-SKILL_ACK=$(cat ~/.claude/.skill-nonce):evaluating-dependencies npm install <pkg>@<version>       # -D for dev
-SKILL_ACK=$(cat ~/.claude/.skill-nonce):evaluating-dependencies pnpm add <pkg>@<version>          # -D for dev
-SKILL_ACK=$(cat ~/.claude/.skill-nonce):evaluating-dependencies yarn add <pkg>@<version>          # -D for dev
-SKILL_ACK=$(cat ~/.claude/.skill-nonce):evaluating-dependencies bun add <pkg>@<version>           # -d for dev
+npm install <pkg>@<version>       # -D for dev
+pnpm add <pkg>@<version>          # -D for dev
+yarn add <pkg>@<version>          # -D for dev
+bun add <pkg>@<version>           # -d for dev
 ```
-
-The `SKILL_ACK=<nonce>:evaluating-dependencies` prefix signals to the skill-advisor hook that this skill has been consulted. The nonce is generated per session and prevents bypassing the skill.
 
 **Common categories:**
 
@@ -238,9 +236,9 @@ cargo outdated
 **Install (pinned, via cargo add):**
 
 ```bash
-SKILL_ACK=$(cat ~/.claude/.skill-nonce):evaluating-dependencies cargo add <crate>@<version>
-SKILL_ACK=$(cat ~/.claude/.skill-nonce):evaluating-dependencies cargo add <crate>@<version> --features "a,b"
-SKILL_ACK=$(cat ~/.claude/.skill-nonce):evaluating-dependencies cargo add <crate>@<version> --dev
+cargo add <crate>@<version>
+cargo add <crate>@<version> --features "a,b"
+cargo add <crate>@<version> --dev
 ```
 
 **Reference:** [lib.rs](https://lib.rs) is a better UX than crates.io for browsing; it surfaces maintenance signals and usage counts.
@@ -284,11 +282,11 @@ safety check
 
 ```bash
 # pip
-SKILL_ACK=$(cat ~/.claude/.skill-nonce):evaluating-dependencies pip install '<pkg>==<version>'
+pip install '<pkg>==<version>'
 
 # uv (preferred)
-SKILL_ACK=$(cat ~/.claude/.skill-nonce):evaluating-dependencies uv add '<pkg>==<version>'
-SKILL_ACK=$(cat ~/.claude/.skill-nonce):evaluating-dependencies uv add --dev '<pkg>==<version>'
+uv add '<pkg>==<version>'
+uv add --dev '<pkg>==<version>'
 ```
 
 ### go modules
@@ -319,7 +317,7 @@ go list -m -u all                 # outdated
 **Install (pinned):**
 
 ```bash
-SKILL_ACK=$(cat ~/.claude/.skill-nonce):evaluating-dependencies go get <module>@<version>
+go get <module>@<version>
 go mod tidy
 ```
 
@@ -349,7 +347,7 @@ dotnet list package --outdated
 **Install (pinned):**
 
 ```bash
-SKILL_ACK=$(cat ~/.claude/.skill-nonce):evaluating-dependencies dotnet add package <Name> --version <ver>
+dotnet add package <Name> --version <ver>
 ```
 
 For install *mechanics* (Central Package Management, version variables, workspaces), defer to the `nuget-package-management` skill.
