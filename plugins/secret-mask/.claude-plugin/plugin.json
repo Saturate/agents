@@ -1,0 +1,6 @@
+{
+  "name": "secret-mask",
+  "version": "0.1.0",
+  "description": "Swaps secrets for placeholders before they reach the model, and puts them back only when a tool call you approve runs.",
+  "types": "./types/index.d.ts"
+}

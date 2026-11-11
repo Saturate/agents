@@ -21,6 +21,12 @@
       "source": "./plugins/skill-router",
       "description": "Injects a skill-routing meta-skill at session start and emits just-in-time skill advisories before high-signal Bash commands (npm install, cargo add, git commit, dotnet add package, etc).",
       "version": "3.1.0"
+    },
+    {
+      "name": "secret-mask",
+      "source": "./plugins/secret-mask",
+      "description": "Mod that swaps secrets for placeholders before they reach the model and puts them back only in tool calls you approve.",
+      "version": "0.1.0"
     }
   ]
 }

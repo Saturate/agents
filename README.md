@@ -38,6 +38,7 @@ The [observability plugin](plugins/observability/) (hook logging with optional L
 ```
 /plugin install observability@Saturate-agents
 /plugin install skill-router@Saturate-agents
+/plugin install secret-mask@Saturate-agents
 ```
 
 ## Skills
