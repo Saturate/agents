@@ -7,7 +7,9 @@ It has two parts:
 - **At session start** a settings hook injects the [skill-router meta-skill](../../skills/skill-router/SKILL.md), the map of which skill fits which task.
 - **On every tool call** a mod (`hooks/register.ts`) checks the call against [`scripts/advisor-rules.conf`](scripts/advisor-rules.conf).
 
-[`diagrams/hook-flow.mmd`](diagrams/hook-flow.mmd) shows the flow, generated from the rules file.
+![Hook flow](diagrams/hook-flow.png)
+
+The diagram is generated from the rules file; its source is [`diagrams/hook-flow.mmd`](diagrams/hook-flow.mmd).
 
 ## What the rules do
 
