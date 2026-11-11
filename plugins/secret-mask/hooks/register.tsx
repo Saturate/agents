@@ -2,6 +2,7 @@ import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register } from 'claude-code'
 
 import type { Secret } from '../types'
+import { GUIDE } from './guide'
 import { Vault, isEnvFilePath, mentionsEnvFile, placeholderFor, rewriteStrings, visitStrings } from './vault'
 
 // Bump the tag when Secret's fields change: a stored list from an older shape
@@ -143,7 +144,17 @@ async function addUserSecret($: EngineInterface, value: string): Promise<void> {
   await $.prompt.fill({ text: placeholderFor(secret), mode: 'insert' })
 }
 
+
 export const register: Register = on => {
+  // prompt.compose would be the natural place, but the built-in sec-default
+  // guard keeps user-installed mods off it, so the guide rides on Bash's
+  // description. It must stay identical for the whole session: a changed tool
+  // description discards the prompt cache.
+  on('tool.describe', { tool: 'Bash' }, async ($, e, next) => {
+    const described = await next(e)
+    return { ...described, description: `${described.description}\n\n${GUIDE}` }
+  })
+
   on('session.start', async ($, e, next) => {
     // Commands first, so a failing env scan can't leave the session without them.
     await $.command.register({ name: 'secrets', description: 'List the secrets secret-mask is hiding from Claude' })

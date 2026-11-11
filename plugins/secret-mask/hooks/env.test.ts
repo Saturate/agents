@@ -1,5 +1,6 @@
 import { expect, test } from 'claude-code/testing'
 
+import { GUIDE } from './guide'
 import { Vault, isEnvFilePath } from './vault'
 
 const ph = (rest: string): string => '{' + '{SECRET_' + rest + '}' + '}'
@@ -127,4 +128,10 @@ test('url password detection stays fast on long dotted text', () => {
   vault.detect('a.'.repeat(100000))
 
   expect(Date.now() - started).toBeLessThan(500)
+})
+
+test('the guide for Claude never holds a real-looking placeholder', () => {
+  // Copying an example out of the guide must never unmask a real secret.
+  expect(/\{\{SECRET_\d/.test(GUIDE)).toBe(false)
+  expect(GUIDE).toContain('/mask')
 })

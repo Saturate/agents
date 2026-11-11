@@ -26,7 +26,7 @@
       "name": "secret-mask",
       "source": "./plugins/secret-mask",
       "description": "Mod that swaps secrets for placeholders before they reach the model and puts them back only in tool calls you approve.",
-      "version": "0.1.0"
+      "version": "0.2.0"
     }
   ]
 }
