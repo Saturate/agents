@@ -87,9 +87,11 @@ function closingParen(text: string, open: number): number {
 }
 
 // Quoted text is blanked so a commit message is never read as a command. A
-// command substitution inside double quotes still runs, so its body is kept
-// as commands of its own. One left-to-right pass, because an apostrophe
-// inside double quotes must not pair with a later single quote.
+// command substitution, quoted or not, still runs, so its body is kept as
+// commands of its own and the text around it stays one word: splitting at
+// `$(` would cut `PATH=$(pwd)/bin git push` into pieces that match nothing.
+// One left-to-right pass, because an apostrophe inside double quotes must not
+// pair with a later single quote.
 function blankQuotes(text: string): { outer: string; inner: string[] } {
   let outer = ''
   const inner: string[] = []
@@ -104,6 +106,16 @@ function blankQuotes(text: string): { outer: string; inner: string[] } {
     } else if (c === '\\') {
       outer += text.slice(i, i + 2)
       i += 2
+    } else if (text.startsWith('$(', i)) {
+      const close = closingParen(text, i + 1)
+      inner.push(text.slice(i + 2, close))
+      outer += '""'
+      i = close + 1
+    } else if (c === '`') {
+      const close = text.indexOf('`', i + 1)
+      inner.push(text.slice(i + 1, close === -1 ? text.length : close))
+      outer += '""'
+      i = close === -1 ? text.length : close + 1
     } else if (c === "'") {
       const end = text.indexOf("'", i + 1)
       outer += "''"
@@ -150,7 +162,7 @@ export function commandSegments(command: string, depth = 0): string[] {
   )
   const { outer, inner } = blankQuotes(withoutHeredocs)
   const segments = outer
-    .split(/\|\||&&|[;|&\n`]|\$\(|[()]/)
+    .split(/\|\||&&|[;|&\n]|[()]/)
     .map(stripPrefixes)
     .filter(segment => segment.length > 0)
   if (depth >= MAX_DEPTH) return segments
