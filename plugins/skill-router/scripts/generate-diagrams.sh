@@ -46,11 +46,11 @@ generate_hook_diagram() {
       s/\[\\s\]\+/ /g
     ' | head -c 40)
 
-    if [ "$action" = "gate" ]; then
+    if [ "$action" = "gate" ] || [ "$action" = "gate-tool" ]; then
       gate_idx=$((gate_idx + 1))
       gate_nodes="${gate_nodes}        G${gate_idx}[\"${label}\n${short_pat}\"]
 "
-    elif [ "$action" = "block" ]; then
+    elif [ "$action" = "block" ] || [ "$action" = "block-tool" ]; then
       block_idx=$((block_idx + 1))
       block_nodes="${block_nodes}        B${block_idx}[\"/${label}\n${short_pat}\"]
 "
@@ -65,29 +65,28 @@ generate_hook_diagram() {
 %% Auto-generated from advisor-rules.conf — do not edit by hand
 %% Regenerate: bash plugins/skill-router/scripts/generate-diagrams.sh
 flowchart TB
-    subgraph hook["PreToolUse Hook · skill-advisor.sh"]
+    subgraph hook["tool.call hook · hooks/register.ts"]
         direction TB
-        CMD[/"Bash command"/]
-        NORM["Split on && and ;"]
-        ACK{"SKILL_ACK\npresent?"}
-        STRIP["Strip ACK'd segments\nkeep the rest"]
-        EMPTY{"Segments\nremaining?"}
-        MATCH{"Match rules\n(first hit wins)"}
+        CMD[/"Bash command or MCP tool call"/]
+        NORM["Blank quotes and heredocs\nsplit on && || ; | and \$()"]
+        MATCH{"Match rules\n(first hit wins per command)"}
 
-        CMD --> NORM --> ACK
-        ACK -->|"Some"| STRIP --> EMPTY
-        ACK -->|"No"| MATCH
-        EMPTY -->|"None"| PASS1(("Pass"))
-        EMPTY -->|"Yes"| MATCH
+        CMD --> NORM --> MATCH
     end
 
-    GATE["GATE\nBlock + custom message"]
-    BLOCK["BLOCK\nBlock + skill nudge"]
-    PASS2(("Pass"))
+    LOADED{"Skill loaded in\nthis conversation?"}
+    ASK{"Person approves\nin a dialog?"}
+    DENY1["DENY\nInvoke the skill first"]
+    DENY2["DENY\nNot approved"]
+    PASS(("Run"))
 
-    MATCH -->|"gate"| GATE
-    MATCH -->|"block"| BLOCK
-    MATCH -->|"no match"| PASS2
+    MATCH -->|"block"| LOADED
+    MATCH -->|"gate"| ASK
+    MATCH -->|"no match"| PASS
+    LOADED -->|"Yes"| PASS
+    LOADED -->|"No"| DENY1
+    ASK -->|"Yes"| PASS
+    ASK -->|"No, or claude -p"| DENY2
 
     subgraph gates["Gate Rules · ${gate_idx} rules"]
 ${gate_nodes}    end
@@ -95,14 +94,15 @@ ${gate_nodes}    end
     subgraph blocks["Block Rules · ${block_idx} rules"]
 ${block_nodes}    end
 
-    GATE -.-> gates
-    BLOCK -.-> blocks
+    ASK -.-> gates
+    LOADED -.-> blocks
 
     style hook fill:#1e1e2e,stroke:#89b4fa,color:#cdd6f4
-    style GATE fill:#f38ba8,stroke:#f38ba8,color:#1e1e2e
-    style BLOCK fill:#fab387,stroke:#fab387,color:#1e1e2e
-    style PASS1 fill:#a6e3a1,stroke:#a6e3a1,color:#1e1e2e
-    style PASS2 fill:#a6e3a1,stroke:#a6e3a1,color:#1e1e2e
+    style ASK fill:#f38ba8,stroke:#f38ba8,color:#1e1e2e
+    style LOADED fill:#fab387,stroke:#fab387,color:#1e1e2e
+    style DENY1 fill:#45475a,stroke:#fab387,color:#cdd6f4
+    style DENY2 fill:#45475a,stroke:#f38ba8,color:#cdd6f4
+    style PASS fill:#a6e3a1,stroke:#a6e3a1,color:#1e1e2e
     style gates fill:#302040,stroke:#cba6f7,color:#cdd6f4
     style blocks fill:#1e2030,stroke:#89b4fa,color:#cdd6f4
 MERMAID

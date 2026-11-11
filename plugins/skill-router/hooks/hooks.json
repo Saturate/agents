@@ -1,5 +1,6 @@
 {
-  "description": "Injects skill-router meta-skill on SessionStart, emits JIT skill advisories on PreToolUse Bash, and gates MCP PR creation.",
+  "description": "Injects the skill-router meta-skill at session start. The hooks module enforces skill use and approval gates on tool calls.",
+  "modules": ["./register.ts"],
   "hooks": {
     "SessionStart": [
       {
@@ -7,28 +8,6 @@
           {
             "type": "command",
             "command": "${CLAUDE_PLUGIN_ROOT}/scripts/inject-meta-skill.sh",
-            "timeout": 5
-          }
-        ]
-      }
-    ],
-    "PreToolUse": [
-      {
-        "matcher": "Bash",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/scripts/skill-advisor.sh",
-            "timeout": 5
-          }
-        ]
-      },
-      {
-        "matcher": "mcp__.*__repo_create_pull_request$",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/scripts/mcp-pr-gate.sh",
             "timeout": 5
           }
         ]

@@ -5,7 +5,7 @@ compatibility: Requires git for full classification. Falls back to tmp backup wi
 allowed-tools: Bash Read
 metadata:
   author: Saturate
-  version: "1.0"
+  version: "1.1"
 ---
 
 # Safe Delete
@@ -15,7 +15,7 @@ metadata:
 - [ ] Classify targets (regenerable / git-tracked clean / dirty or untracked)
 - [ ] Back up anything that can't be recovered
 - [ ] Verify backup exists
-- [ ] Delete with SKILL_ACK prefix
+- [ ] Delete
 - [ ] Verify nothing broke
 
 ## Step 0: Classify Every Target
@@ -106,10 +106,10 @@ If the backup isn't there, **stop** and tell the user.
 
 ## Step 3: Delete
 
-Use the `SKILL_ACK=<nonce>:safe-delete` prefix so the advisor hook lets it through:
+Now that the backup is verified, delete:
 
 ```bash
-SKILL_ACK=$(cat ~/.claude/.skill-nonce):safe-delete rm -rf <path>
+rm -rf <path>
 ```
 
 ## Step 4: Verify Nothing Broke
