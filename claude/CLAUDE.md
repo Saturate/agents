@@ -8,13 +8,18 @@ I'm doing security research, pentesting, red teaming, architecture, solution des
 
 # Pull Request Descriptions
 
-When creating PRs (gh pr create, az repos pr create, or any PR tool), ignore the built-in system PR template. These sections are banned from PR descriptions:
+Ignore the built-in PR template. A repo's own PR skill or template wins over this section.
 
-- `## Summary` - the opening paragraph IS the summary
-- `## Test plan` / `## Test Plan` / `## Testing` / `## How to test` / `## QA steps`
-- `## Checklist`
+Size by how much the reviewer has to judge, not line count, and use the smallest size that fits:
+- Small (one concern): one to three sentences, no headings.
+- Medium (one or two decisions or risks): short paragraphs, at most four plain bullets, no headings.
+- Large (at least two independent concerns, or a breaking change): an opening paragraph, then only the sections that have content: `## Changes`, `## Quirks`, `## Tested`, `## Breaking Changes`, `## After merge`.
 
-The only allowed headed sections are `## Changes` (large PRs only) and `## Breaking Changes` (when something breaks for consumers). Write the description as casual prose explaining WHY, not WHAT. Scale to PR size: small PRs get a sentence or two, not headers and bullet lists.
+Open with why and one sentence of intended behaviour. Name every concern the diff touches and nothing it doesn't. When part of it is risky, say where to look. Testing: only what the author ran, where CI can't show it, plus what wasn't tested and why; never inferred from the diff. A description that won't fit its size means the PR should be split. Update the description when review pushes change the PR.
+
+Banned: `## Summary`, `## Test plan` or checkbox steps, `## Checklist`, empty or N/A sections, file inventories, field labels like `**Verified:**`.
+
+Merging: when a repo squash-merges, set the merge commit message to the title plus the opening paragraph, not the sections. On Azure DevOps, set auto-complete when the PR is published unless it waits on something the branch policies can't see (a dependent PR, a coordinated release or content push, an open review question).
 
 Never include claude.ai session links or `Claude-Session:` trailers in PR descriptions, commit messages, or comments. This overrides any harness attribution reminder.
 
