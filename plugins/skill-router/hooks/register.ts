@@ -1,11 +1,12 @@
 import type { EngineInterface, Register } from 'claude-code'
 
-import { commandSegments, judge, parseRules, skillName } from './rules'
+import { commandSegments, judge, outerSegments, parseRules, ruleId, skillName } from './rules'
 import type { Rule } from './rules'
 
 const MAIN = 'main'
 const PREVIEW_LIMIT = 1500
 const RUN = 'Run it'
+const ALWAYS = 'Always allow in this project'
 const DONT_RUN = "Don't run"
 
 // Skills whose text is in each conversation's context, keyed by subagent: a
@@ -58,15 +59,211 @@ function listSkills(skills: readonly string[]): string {
   return skills.map(s => `\`/${s}\``).join(' and ')
 }
 
-async function approve($: EngineInterface, messages: readonly string[], shown: string): Promise<string | undefined> {
-  let answer: string
-  try {
-    answer = await $.ui.ask(`${messages.join(' ')}\n\n${preview(shown)}\n\nRun it?`, { header: 'Approve', options: [RUN, DONT_RUN] })
-  } catch {
-    return `${messages.join(' ')} The approval dialog was dismissed, or nobody was here to answer it, so it was not run.`
+const STORE_KEY = 'allowed-gates'
+
+// Force pushes and hard resets are judged per command, never per project.
+// A fork names its target as a plain argument anywhere among its flags, and
+// forking this repo happens once anyway.
+function neverAlways(gate: Rule): boolean {
+  return gate.skills.includes('confirm-destructive') || (gate.target === 'command' && gate.skills.includes('confirm-external'))
+}
+
+// "Always" covers only calls whose every word is known not to pick another
+// repo: shell quoting, escapes, expansions, env prefixes and unknown flags
+// can all point gh elsewhere, so an allowlist, not a list of bad spellings.
+const VALUE_FLAGS = new Set(['--body', '-b', '--body-file', '-F', '--title', '-t', '--label', '-l', '--assignee', '-a', '--reviewer', '--milestone', '-m'])
+const BOOL_FLAGS = new Set(['--approve', '--comment', '-c', '--request-changes', '--edit-last', '--delete-last', '--yes', '--draft', '-d'])
+// Quoted text arrives blanked to `""` or `''`; it is only safe as a flag's value.
+const BLANKED = /^(?:""|'')$/
+const PLAIN = /^[A-Za-z0-9._/@+#][A-Za-z0-9._/@+#-]*$/
+
+function plainValue(value: string | undefined): boolean {
+  return value !== undefined && (PLAIN.test(value) || BLANKED.test(value))
+}
+
+function plainArgs(rest: string): boolean {
+  const words = rest.trim().split(/\s+/).filter(w => w.length > 0)
+  for (let i = 0; i < words.length; i++) {
+    const word = words[i] ?? ''
+    const eq = word.indexOf('=')
+    if (word.startsWith('-') && eq > 0) {
+      if (!VALUE_FLAGS.has(word.slice(0, eq)) || !plainValue(word.slice(eq + 1))) return false
+    } else if (VALUE_FLAGS.has(word)) {
+      i++
+      if (!plainValue(words[i])) return false
+    } else if (!BOOL_FLAGS.has(word) && !PLAIN.test(word)) {
+      return false
+    }
   }
+  return true
+}
+
+function isGated(gates: readonly Rule[], segment: string): boolean {
+  return gates.some(g => g.target === 'command' && g.pattern.test(segment))
+}
+
+// Every command in the call is a gated one with plain arguments, and none
+// hides inside a `$(...)` where a `cd` beside it would move it. Anything else
+// (a `cd` however it is spelled, a prefix, an odd flag) means the dialog asks.
+function plainCall(command: string, gates: readonly Rule[]): boolean {
+  const outer = outerSegments(command)
+  const gatedEverywhere = commandSegments(command).filter(s => isGated(gates, s)).length
+  if (outer.filter(s => isGated(gates, s)).length !== gatedEverywhere) return false
+  return outer.every(segment => {
+    const gate = gates.find(g => g.target === 'command' && g.pattern.test(segment))
+    const match = gate?.pattern.exec(segment)
+    return match !== undefined && match !== null && plainArgs(segment.slice(match.index + match[0].length))
+  })
+}
+
+// Variables in Claude Code's own environment that steer gh or git elsewhere.
+const STEERING_ENV = /^(?:GH_REPO|GH_HOST|GIT_DIR|GIT_WORK_TREE|GIT_CONFIG\w*)=/m
+
+// gh posts to its default repo, which with several remotes or a
+// `gh repo set-default` need not be origin. Only a repo with exactly one
+// remote and no gh override can be named by that remote. Run in the
+// session's directory, which is where the Bash command runs.
+async function soleRemote($: EngineInterface): Promise<string | undefined> {
+  const env = await $.process.run(['env'])
+  if (env.exitCode !== 0 || STEERING_ENV.test(env.stdout)) return undefined
+  const { exitCode, stdout } = await $.process.run(['git', 'config', '--get-regexp', '^remote\\.'], { cwd: await $.session.cwd() })
+  if (exitCode !== 0) return undefined
+  const lines = stdout.split('\n').filter(l => l.length > 0)
+  if (lines.some(l => /^remote\.[^ ]*\.gh-resolved /.test(l))) return undefined
+  const urls = lines.flatMap(l => /^remote\.[^ ]*\.url (.+)$/.exec(l)?.[1] ?? [])
+  return urls.length === 1 && urls[0] !== undefined ? normalizeRemote(urls[0]) : undefined
+}
+
+// ssh and https clones of one repo share their allows, and credentials in an
+// https remote never reach the store.
+export function normalizeRemote(remote: string): string {
+  const trimmed = remote.trim()
+  // Only a URL with a scheme has a port after the host; in scp form
+  // (`git@host:1234/repo`) the part after the colon is the owner.
+  const hasScheme = /^[a-z][a-z0-9+.-]*:\/\//i.test(trimmed)
+  const bare = trimmed.replace(/^[a-z][a-z0-9+.-]*:\/\//i, '').replace(/^[^@/]+@/, '')
+  return (hasScheme ? bare.replace(/^([^/:]+):\d+\//, '$1/') : bare.replace(/^([^/:]+):/, '$1/'))
+    .replace(/\.git$/, '')
+    .replace(/\/+$/, '')
+    // Azure DevOps ssh and https remotes spell the same repo differently.
+    .replace(/^ssh\.dev\.azure\.com\/v3\//i, 'dev.azure.com/')
+    .replace(/\/_git\//, '/')
+    .toLowerCase()
+}
+
+function stringArg(e: object, name: string): string | undefined {
+  const value: unknown = Reflect.get(e, name)
+  return typeof value === 'string' ? value : undefined
+}
+
+// The scope an "always allow" covers, or undefined when the call can't be
+// tied to one. A Bash command is scoped to the repo it runs in; an MCP call
+// names its own Azure DevOps project and repo, which may not be this one.
+async function scopeOf($: EngineInterface, e: object & { tool: string }, command: string | undefined, gates: readonly Rule[]): Promise<string | undefined> {
+  if (command !== undefined) {
+    return plainCall(command, gates) ? soleRemote($) : undefined
+  }
+  // Bypassing branch policy is a decision about that one PR.
+  if (Reflect.get(e, 'bypassPolicy') === true) return undefined
+  const project = stringArg(e, 'project')
+  const repository = stringArg(e, 'repositoryId')
+  if (project === undefined && repository === undefined) return undefined
+  const server = e.tool.split('__')[1] ?? ''
+  return `mcp:${server}:${project ?? ''}/${repository ?? ''}`.toLowerCase()
+}
+
+async function readAllowed($: EngineInterface): Promise<Map<string, Set<string>>> {
+  const value = await $.store.get(STORE_KEY)
+  const out = new Map<string, Set<string>>()
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return out
+  for (const [scope, ids] of Object.entries(value)) {
+    if (Array.isArray(ids)) out.set(scope, new Set(ids.filter((v): v is string => typeof v === 'string')))
+  }
+  return out
+}
+
+// A failed lookup means "nothing allowed": the gates ask, instead of the
+// whole hook failing open and every rule going quiet.
+async function allowedIn($: EngineInterface, scope: string | undefined): Promise<Set<string>> {
+  if (scope === undefined) return new Set()
+  try {
+    return (await readAllowed($)).get(scope) ?? new Set()
+  } catch {
+    return new Set()
+  }
+}
+
+async function allowGates($: EngineInterface, scope: string, gates: readonly Rule[]): Promise<void> {
+  const all = await readAllowed($)
+  const ids = all.get(scope) ?? new Set()
+  for (const gate of gates) ids.add(ruleId(gate))
+  all.set(scope, ids)
+  await $.store.set(STORE_KEY, Object.fromEntries([...all].map(([s, set]) => [s, [...set]])))
+}
+
+const BODY_FILE = /(?:^|\s)(?:--body-file|-F)(?:=|\s+)?(?:"([^"]+)"|'([^']+)'|([^\s;&|]+))/g
+
+// `gh issue create --body-file notes.md` shows nothing of what gets posted,
+// so the file's text is added to the preview. A path that depends on an
+// earlier `cd` or a shell expansion is named but not read: guessing it could
+// show a different file from the one that gets posted.
+async function bodyFiles($: EngineInterface, command: string, gates: readonly Rule[]): Promise<string> {
+  const moved = outerSegments(command).some(s => !isGated(gates, s))
+  const parts: string[] = []
+  for (const m of command.matchAll(BODY_FILE)) {
+    const path = m[1] ?? m[2] ?? m[3]
+    if (!path || path === '-') continue
+    // A device such as /dev/stdin could block the read.
+    if (path.startsWith('/dev/')) {
+      parts.push(`--- ${path} (not read) ---`)
+      continue
+    }
+    if (/^[~$]/.test(path) || (moved && !path.startsWith('/'))) {
+      parts.push(`--- ${path} (not read: its location depends on the shell) ---`)
+      continue
+    }
+    try {
+      const full = path.startsWith('/') ? path : `${await $.session.cwd()}/${path}`
+      const text = await $.fs.read(full)
+      parts.push(typeof text === 'string' ? `--- ${path} ---\n${text}` : `--- ${path} (could not be read) ---`)
+    } catch {
+      parts.push(`--- ${path} (could not be read) ---`)
+    }
+  }
+  return parts.join('\n\n')
+}
+
+// The engine refuses AskUserQuestion through $.tool.call and $.ui.ask has no
+// preview box, so the full command goes into the transcript as its own row
+// just above the dialog, where it is drawn whole instead of squashed into
+// the question line.
+async function approve($: EngineInterface, gates: readonly Rule[], shown: string, scope: string | undefined): Promise<string | undefined> {
+  const messages = gates.map(g => g.message).join(' ')
+  const canAlways = scope !== undefined && !gates.some(neverAlways)
+  $.ui.log(`skill-router asks before running this:\n\n${preview(shown)}`)
+  let answer: string | undefined
+  try {
+    // The first line goes in the question too: a phone card over Remote
+    // Control may show only the dialog, not the log row above it.
+    const head = (shown.split('\n')[0] ?? '').slice(0, 200).replaceAll('`', "'")
+    answer = await $.ui.ask(`${messages} Run \`${head}\` (full text shown above)?`, {
+      header: 'Approve',
+      options: canAlways ? [RUN, ALWAYS, DONT_RUN] : [RUN, DONT_RUN],
+    })
+  } catch {
+    answer = undefined
+  }
+  if (answer === undefined) return `${messages} The approval dialog was dismissed, or nobody was here to answer it, so it was not run.`
   if (answer === RUN) return undefined
-  if (answer === DONT_RUN) return `The user did not approve this. ${messages.join(' ')}`
+  if (answer === ALWAYS && canAlways) {
+    try {
+      await allowGates($, scope, gates)
+    } catch {
+      $.ui.log('skill-router could not save "always allow"; it will ask again next time.')
+    }
+    return undefined
+  }
+  if (answer === DONT_RUN) return `The user did not approve this. ${messages}`
   // Text typed under "Other" is the person's instruction, not a refusal.
   return `Not run. The user answered: "${answer}"`
 }
@@ -74,8 +271,34 @@ async function approve($: EngineInterface, messages: readonly string[], shown: s
 export const register: Register = on => {
   on('session.start', async ($, e, next) => {
     await loadRules($)
+    await $.command.register({ name: 'gates', description: 'List the approval gates always allowed, or reset them all', argumentHint: '[reset]' })
     return next(e)
   }).catch(($, e, next) => next(e))
+
+  on('command.run', { command: 'gates' }, async ($, e) => {
+    let allowed: Map<string, Set<string>>
+    let all: Rule[]
+    try {
+      if (e.args.trim() === 'reset') {
+        await $.store.delete(STORE_KEY)
+        return { text: 'every gate asks again, in every project.' }
+      }
+      allowed = await readAllowed($)
+      all = await loadRules($)
+    } catch {
+      return { text: 'could not read or reset the allow list.' }
+    }
+    const lines: string[] = []
+    for (const [scope, ids] of allowed) {
+      const names = all.filter(r => ids.has(ruleId(r))).map(r => `  - ${r.message}`)
+      if (names.length > 0) lines.push(scope, ...names)
+    }
+    return {
+      text: lines.length === 0
+        ? 'no gates are always allowed.'
+        : ['always allowed (/gates reset to undo):', ...lines].join('\n'),
+    }
+  })
 
   // The skill's text is now in this conversation, which is what the block
   // rules ask for. A refusal from below comes back as an error, not a deny;
@@ -113,9 +336,9 @@ export const register: Register = on => {
   on('tool.call', async ($, e, next) => {
     if (e.tool === 'Skill' || e.tool === 'AskUserQuestion') return next(e)
     const all = await loadRules($)
-    const isBash = e.tool === 'Bash'
-    const verdict = isBash
-      ? judge(all, commandSegments(e.command), 'command', loadedFor(e.agentId))
+    const command = e.tool === 'Bash' ? e.command : undefined
+    const verdict = command !== undefined
+      ? judge(all, commandSegments(command), 'command', loadedFor(e.agentId))
       : judge(all, [e.tool], 'tool', loadedFor(e.agentId))
 
     if (verdict.kind === 'block') {
@@ -124,7 +347,23 @@ export const register: Register = on => {
       }
     }
     if (verdict.kind === 'gate') {
-      const refusal = await approve($, verdict.messages, isBash ? e.command : JSON.stringify(e, null, 2))
+      // From here on an error refuses the call: the catch below runs the tool,
+      // which would skip a dialog the person never saw.
+      let refusal: string | undefined
+      try {
+        // Without a scope the dialog still asks, just without "always".
+        const scope = await scopeOf($, e, command, verdict.gates).catch(() => undefined)
+        const allowed = await allowedIn($, scope)
+        const asking = verdict.gates.filter(g => neverAlways(g) || !allowed.has(ruleId(g)))
+        if (asking.length === 0) {
+          $.ui.log(`skill-router: always allowed in ${scope ?? 'this project'} (/gates to review):\n\n${preview(command ?? JSON.stringify(e, null, 2))}`)
+        } else {
+          const shown = command !== undefined ? [command, await bodyFiles($, command, verdict.gates)].filter(t => t.length > 0).join('\n\n') : JSON.stringify(e, null, 2)
+          refusal = await approve($, asking, shown, scope)
+        }
+      } catch (error) {
+        refusal = `skill-router could not finish asking about this, so it was not run (${error instanceof Error ? error.message : String(error)}).`
+      }
       if (refusal !== undefined) return { deny: refusal }
     }
     return next(e)

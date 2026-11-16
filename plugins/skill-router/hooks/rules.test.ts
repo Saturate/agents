@@ -44,7 +44,7 @@ test('a quoted string never counts as a command', () => {
 
 test('a force push gets the gate, not the push skill', () => {
   const verdict = judge(RULES, commandSegments('git push --force origin x'), 'command', none)
-  expect(verdict).toEqual({ kind: 'gate', messages: ['This force-pushes.'] })
+  expect(verdict.kind === 'gate' ? verdict.gates.map(g => g.message) : []).toEqual(['This force-pushes.'])
 })
 
 test('a block needs every listed skill', () => {

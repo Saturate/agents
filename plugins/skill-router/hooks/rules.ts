@@ -155,18 +155,29 @@ const MAX_DEPTH = 20
 // matched on its own. Heredoc bodies are dropped first: a commit message
 // whose body has a line starting with `git push` is not a push. The rest of
 // the line that opens the heredoc still runs, so it is kept.
-export function commandSegments(command: string, depth = 0): string[] {
+function split(command: string): { parts: string[]; inner: string[] } {
   const withoutHeredocs = command.replace(
     /<<-?\s*(['"]?)([A-Za-z_][A-Za-z0-9_]*)\1([^\n]*)\n[\s\S]*?\n\s*\2(?=\n|$)/g,
     (_whole: string, _quote: string, _word: string, rest: string) => ` ${rest}`,
   )
   const { outer, inner } = blankQuotes(withoutHeredocs)
-  const segments = outer
-    .split(/\|\||&&|[;|&\n]|[()]/)
-    .map(stripPrefixes)
-    .filter(segment => segment.length > 0)
+  return { parts: outer.split(/\|\||&&|[;|&\n]|[()]/), inner }
+}
+
+export function commandSegments(command: string, depth = 0): string[] {
+  const { parts, inner } = split(command)
+  const segments = parts.map(stripPrefixes).filter(segment => segment.length > 0)
   if (depth >= MAX_DEPTH) return segments
   return [...segments, ...inner.flatMap(body => commandSegments(body, depth + 1))]
+}
+
+// The commands of the call itself, without the bodies of `$(...)`, each with
+// its prefixes (`FOO=bar`, `env`, `sudo`) still on: the scope check treats
+// any of those as a reason to ask.
+export function outerSegments(command: string): string[] {
+  return split(command)
+    .parts.map(part => part.trim())
+    .filter(part => part.length > 0)
 }
 
 // The skill name as rules write it: `plugin:skill` loads `skill`.
@@ -177,24 +188,30 @@ export function skillName(name: string): string {
 export type Verdict =
   | { kind: 'allow' }
   | { kind: 'block'; missing: readonly string[] }
-  | { kind: 'gate'; messages: readonly string[] }
+  | { kind: 'gate'; gates: readonly Rule[] }
+
+// A rule's identity for "always allow": its pattern, so allowing
+// `gh issue create` doesn't also allow the other draft-first rules.
+export function ruleId(rule: Rule): string {
+  return rule.pattern.source
+}
 
 // First matching rule wins per segment, so a force push gets the destructive
 // gate rather than the push skill. Blocks win over gates: no point asking the
 // person to approve a command the model isn't ready to run.
 export function judge(rules: readonly Rule[], targets: readonly string[], target: Rule['target'], loaded: ReadonlySet<string>): Verdict {
   const missing = new Set<string>()
-  const messages: string[] = []
+  const gates: Rule[] = []
   for (const text of targets) {
     const rule = rules.find(r => r.target === target && r.pattern.test(text))
     if (!rule) continue
     if (rule.kind === 'block') {
       for (const skill of rule.skills) if (!loaded.has(skill)) missing.add(skill)
-    } else if (!messages.includes(rule.message)) {
-      messages.push(rule.message)
+    } else if (!gates.includes(rule)) {
+      gates.push(rule)
     }
   }
   if (missing.size > 0) return { kind: 'block', missing: [...missing] }
-  if (messages.length > 0) return { kind: 'gate', messages }
+  if (gates.length > 0) return { kind: 'gate', gates }
   return { kind: 'allow' }
 }
