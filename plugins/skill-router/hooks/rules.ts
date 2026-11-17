@@ -47,17 +47,18 @@ export function parseRules(text: string): Rule[] {
 
 const PREFIXES = [
   /^[({!]\s*/,
-  /^(?:then|do|else|elif|if|while|until)\s+/,
+  /^(?:then|do|else|elif|if|while|until)\s+/i,
   // `\git` skips an alias and `/usr/bin/git` names the binary; both are git.
   /^\\(?=[A-Za-z])/,
   /^\/?(?:[\w.-]+\/)+(?=[\w.-]+(?:\s|$))/,
   // Environment assignments: FOO=bar git commit
   /^[A-Za-z_][A-Za-z0-9_]*=(?:'[^']*'|"[^"]*"|\S*)\s+/,
-  /^(?:sudo|command|exec|time|nohup|env)\s+/,
+  // A case-insensitive filesystem (macOS) runs `ENV` and `NOHUP` too.
+  /^(?:sudo|command|exec|time|nohup|env)\s+/i,
 ]
 
 // `git -C ../repo commit` is still a commit.
-const GIT_GLOBAL_OPTIONS = /^git(?:\s+(?:-C\s+\S+|-c\s+\S+|--no-pager|--git-dir=\S+|--work-tree=\S+))+(?=\s)/
+const GIT_GLOBAL_OPTIONS = /^git(?:\s+(?:-C\s+\S+|-c\s+\S+|--no-pager|--git-dir=\S+|--work-tree=\S+))+(?=\s)/i
 
 function stripPrefixes(segment: string): string {
   let out = segment.trim()
