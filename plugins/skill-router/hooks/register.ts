@@ -138,6 +138,9 @@ async function detectZsh($: EngineInterface): Promise<boolean> {
   for (const name of ['CLAUDE_CODE_SHELL', 'SHELL']) {
     const path = vars.get(name)
     if (path === undefined || !/bash|zsh/.test(path)) continue
+    // Claude Code finds a bare name on its own PATH, which may not be this
+    // process's; not knowing which shell that is means bash rules.
+    if (!path.startsWith('/')) return false
     const test = await $.process.run(['test', '-x', path])
     if (test.exitCode === 0) return path.split('/').pop() === 'zsh'
   }

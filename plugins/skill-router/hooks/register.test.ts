@@ -531,4 +531,7 @@ test('the shell the Bash tool uses decides how a heredoc body is read', async ($
   expect(setup.logged?.[1]).toContain(command)
   expect(setup.logged?.[2]).toContain(command)
   expect(setup.logged?.[3]).toContain("│ It's done")
+  setup.env = 'CLAUDE_CODE_SHELL=bash\nSHELL=/bin/zsh\n'
+  await $.tool.call({ tool: 'Bash', command })
+  expect(setup.logged?.[4]).toContain(command)
 })

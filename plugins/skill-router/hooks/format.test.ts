@@ -108,7 +108,7 @@ test('under bash, a body with quotes, backslashes or # is not read', () => {
 })
 
 test('zsh options that change words are not trusted', () => {
-  for (const command of ['gh pr comment 1 --body done#', "gh pr comment 1 --body 'it''s fine'", 'gh issue create --label P1,bug==ls --body x', 'gh pr comment 1 --body =ls']) {
+  for (const command of ['gh pr comment 1 --body done#', "gh pr comment 1 --body 'it''s fine'", 'gh issue create --label P1,bug==ls --body x', 'gh pr comment 1 --body =ls', "gh pr comment 1 --body ''=gh", 'gh pr comment 1 --body ""=ls', 'gh pr comment 1 --body=a:=ls', "gh pr comment 1 --body=''=ls"]) {
     expect(shellWords(command, true)).toBe(undefined)
   }
   expect(shellWords('gh pr comment 1 --body=x', true)).toEqual(['gh', 'pr', 'comment', '1', '--body=x'])

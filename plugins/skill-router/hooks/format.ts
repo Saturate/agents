@@ -62,8 +62,7 @@ function heredocSub(src: string, start: number, zsh: boolean): { text: string; l
   return { text: body.replace(/\n+$/, ''), length: at + close[0].length - start }
 }
 
-// Unquoted characters whose meaning never depends on the shell. `#` starts a
-// `#` is left out: it starts a comment, and with zsh's extendedglob it is a
+// Unquoted characters whose meaning never depends on the shell. `#` is left out: it starts a comment, and with zsh's extendedglob it is a
 // glob anywhere. `=` is checked apart: at the start of a word zsh expands
 // `=ls` to a path, and with magicequalsubst so does `a==ls`.
 const LITERAL = /[A-Za-z0-9._/@+:,%-]/
@@ -75,13 +74,13 @@ export function shellWords(command: string, zsh = false): string[] | undefined {
   const src = command.trim()
   const words: string[] = []
   let word: string | undefined
-  let afterEquals = false
   let i = 0
   while (i < src.length) {
     const c = src.charAt(i)
     const equals = c === '='
-    if (equals && (word === undefined || afterEquals)) return undefined
-    afterEquals = equals
+    // Only right after a plain character: anywhere else (word start, after
+    // a quote, `=` or `:`) zsh may expand `=ls` to a path.
+    if (equals && !/[A-Za-z0-9._/@+,%-]/.test(src.charAt(i - 1))) return undefined
     if (c === ' ' || c === '\t') {
       if (word !== undefined) words.push(word)
       word = undefined
