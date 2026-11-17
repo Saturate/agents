@@ -57,7 +57,7 @@ function engine(on: Parameters<Parameters<typeof test>[1]>[1], setup: Setup) {
       const id = e.argv[e.argv.indexOf('--id') + 1] ?? ''
       setup.azShown?.push(id)
       const url = setup.azPrRepos?.[id]
-      return { value: { exitCode: url === undefined ? 1 : 0, stdout: url === undefined ? '' : `${url}\n`, stderr: '' } }
+      return { value: { exitCode: url === undefined ? 1 : 0, stdout: url === undefined ? '' : JSON.stringify(url.endsWith('#bypass') ? [url.slice(0, -7), true] : [url, null]), stderr: '' } }
     }
     const remote = setup.remote === undefined ? 'git@example:me/repo.git' : setup.remote
     const stdout = setup.gitConfig ?? (remote === null ? '' : `remote.origin.url ${remote}\nremote.origin.fetch +refs/heads/*:refs/remotes/origin/*\n`)
@@ -557,7 +557,7 @@ test('an az PR vote gets always allow only when az places the PR in this repo', 
     offered: [],
     azShown: [],
     remote: ADO_REMOTE,
-    azPrRepos: { '12': 'https://dev.azure.com/org/proj/_git/web', '13': 'https://dev.azure.com/org/proj/_git/web', '99': 'https://dev.azure.com/org/proj/_git/api' },
+    azPrRepos: { '12': 'https://dev.azure.com/org/proj/_git/web', '13': 'https://dev.azure.com/org/proj/_git/web', '99': 'https://dev.azure.com/org/proj/_git/api', '77': 'https://dev.azure.com/org/proj/_git/web#bypass' },
   }
   engine(on, setup)
 
@@ -568,12 +568,13 @@ test('an az PR vote gets always allow only when az places the PR in this repo', 
   await $.tool.call({ tool: 'Bash', command: 'az repos pr set-vote --id 13 --vote approve --org https://dev.azure.com/other' })
   await $.tool.call({ tool: 'Bash', command: 'az repos pr update --id 13 --status completed --bypass-policy true' })
   await $.tool.call({ tool: 'Bash', command: 'cd ../api && az repos pr set-vote --id 13 --vote approve' })
+  await $.tool.call({ tool: 'Bash', command: 'az repos pr set-vote --id 77 --vote approve' })
   await $.command.run({ command: 'gates', args: 'reset' })
 
   expect(setup.ran).toEqual(['az repos pr set-vote --id 12 --vote approve', 'az repos pr set-vote --id 13 --vote approve'])
-  expect(setup.asked.length).toBe(5)
+  expect(setup.asked.length).toBe(6)
   expect(setup.offered?.slice(1).every(o => !o.includes('Always'))).toBe(true)
-  expect(setup.azShown).toEqual(['12', '13', '99'])
+  expect(setup.azShown).toEqual(['12', '13', '99', '77'])
 })
 
 test('az devops invoke always asks', async ($, on) => {

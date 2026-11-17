@@ -208,8 +208,16 @@ async function azScope($: EngineInterface, shown: Shown): Promise<string | undef
   if (id === undefined || !/^\d+$/.test(id) || AZ_ELSEWHERE.some(k => values[k] !== undefined)) return undefined
   const remote = await soleRemote($)
   if (remote === undefined) return undefined
-  const { exitCode, stdout } = await $.process.run(['az', 'repos', 'pr', 'show', '--id', id, '--query', 'repository.webUrl', '-o', 'tsv'], { cwd: await $.session.cwd() })
-  return exitCode === 0 && normalizeRemote(stdout) === remote ? remote : undefined
+  // A PR that already carries a policy bypass sends it again on completion.
+  const { exitCode, stdout } = await $.process.run(
+    ['az', 'repos', 'pr', 'show', '--id', id, '--query', '[repository.webUrl, completionOptions.bypassPolicy]', '-o', 'json'],
+    { cwd: await $.session.cwd(), timeoutMs: 15000 },
+  )
+  if (exitCode !== 0) return undefined
+  const parsed: unknown = JSON.parse(stdout)
+  if (!Array.isArray(parsed)) return undefined
+  const [url, bypass]: unknown[] = parsed
+  return typeof url === 'string' && bypass !== true && normalizeRemote(url) === remote ? remote : undefined
 }
 
 // The scope an "always allow" covers, or undefined when the call can't be

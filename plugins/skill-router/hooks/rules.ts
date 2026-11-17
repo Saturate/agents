@@ -164,9 +164,26 @@ function split(command: string): { parts: string[]; inner: string[] } {
   return { parts: outer.split(/\|\||&&|[;|&\n]|[()]/), inner }
 }
 
+// The rules are written in lower case. A case-insensitive filesystem (macOS)
+// runs `GIT` as git, and Azure CLI lowercases its command words (`az REPOS PR
+// UPDATE`), so those are matched in lower case too.
+function canonical(segment: string): string {
+  const words = segment.split(/(\s+)/)
+  const az = (words[0] ?? '').toLowerCase() === 'az'
+  let commandWords = true
+  return words
+    .map((word, i) => {
+      if (i === 0) return word.toLowerCase()
+      if (!az || !commandWords || /^\s+$/.test(word)) return word
+      if (word.startsWith('-')) commandWords = false
+      return commandWords ? word.toLowerCase() : word
+    })
+    .join('')
+}
+
 export function commandSegments(command: string, depth = 0): string[] {
   const { parts, inner } = split(command)
-  const segments = parts.map(stripPrefixes).filter(segment => segment.length > 0)
+  const segments = parts.map(stripPrefixes).map(canonical).filter(segment => segment.length > 0)
   if (depth >= MAX_DEPTH) return segments
   return [...segments, ...inner.flatMap(body => commandSegments(body, depth + 1))]
 }
