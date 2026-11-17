@@ -128,17 +128,24 @@ function plainCall(command: string, gates: readonly Rule[]): boolean {
   })
 }
 
-// The Bash tool runs commands in CLAUDE_CODE_SHELL, else the user's SHELL.
-async function runsUnderZsh($: EngineInterface): Promise<boolean> {
-  try {
-    const { exitCode, stdout } = await $.process.run(['env'])
-    if (exitCode !== 0) return false
-    const value = (name: string) => new RegExp(`^${name}=(.*)$`, 'm').exec(stdout)?.[1]
-    const shell = value('CLAUDE_CODE_SHELL') ?? value('SHELL') ?? ''
-    return shell.split('/').pop() === 'zsh'
-  } catch {
-    return false
+// Whether the Bash tool runs zsh, worked out as Claude Code picks its shell:
+// the first of CLAUDE_CODE_SHELL and SHELL that names bash or zsh and is
+// executable. Anything unsure means bash, whose rules are the stricter ones.
+async function detectZsh($: EngineInterface): Promise<boolean> {
+  const env = await $.process.run(['env', '-0'])
+  if (env.exitCode !== 0) return false
+  const vars = new Map(env.stdout.split('\0').map(entry => [entry.slice(0, entry.indexOf('=')), entry.slice(entry.indexOf('=') + 1)]))
+  for (const name of ['CLAUDE_CODE_SHELL', 'SHELL']) {
+    const path = vars.get(name)
+    if (path === undefined || !/bash|zsh/.test(path)) continue
+    const test = await $.process.run(['test', '-x', path])
+    if (test.exitCode === 0) return path.split('/').pop() === 'zsh'
   }
+  return false
+}
+
+function runsUnderZsh($: EngineInterface): Promise<boolean> {
+  return detectZsh($).catch(() => false)
 }
 
 // Variables in Claude Code's own environment that steer gh or git elsewhere.

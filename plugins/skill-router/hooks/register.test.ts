@@ -30,6 +30,8 @@ type Setup = {
   files?: Record<string, string>
   failing?: 'store' | 'repo' | 'cwd'
   sessionId?: string
+  // Shell paths that aren't executable.
+  missing?: string[]
 }
 
 function engine(on: Parameters<Parameters<typeof test>[1]>[1], setup: Setup) {
@@ -41,7 +43,11 @@ function engine(on: Parameters<Parameters<typeof test>[1]>[1], setup: Setup) {
   })
   on('process.run', (_, e) => {
     if (setup.failing === 'repo') throw new Error('git failed')
-    if (e.argv[0] === 'env') return { value: { exitCode: 0, stdout: setup.env ?? 'PATH=/bin\n', stderr: '' } }
+    if (e.argv[0] === 'env') {
+      const env = setup.env ?? 'PATH=/bin\n'
+      return { value: { exitCode: 0, stdout: e.argv[1] === '-0' ? env.split('\n').join('\0') : env, stderr: '' } }
+    }
+    if (e.argv[0] === 'test') return { value: { exitCode: setup.missing?.includes(e.argv[2] ?? '') === true ? 1 : 0, stdout: '', stderr: '' } }
     const remote = setup.remote === undefined ? 'git@example:me/repo.git' : setup.remote
     const stdout = setup.gitConfig ?? (remote === null ? '' : `remote.origin.url ${remote}\nremote.origin.fetch +refs/heads/*:refs/remotes/origin/*\n`)
     return { value: { exitCode: stdout === '' ? 1 : 0, stdout, stderr: '' } }
@@ -514,7 +520,15 @@ test('the shell the Bash tool uses decides how a heredoc body is read', async ($
   await $.tool.call({ tool: 'Bash', command })
   setup.env = 'SHELL=/bin/zsh\nCLAUDE_CODE_SHELL=/bin/bash\n'
   await $.tool.call({ tool: 'Bash', command })
+  setup.env = 'SHELL=/bin/bash\nCLAUDE_CODE_SHELL=/opt/missing/zsh\n'
+  setup.missing = ['/opt/missing/zsh']
+  await $.tool.call({ tool: 'Bash', command })
+  setup.env = 'X=a\nCLAUDE_CODE_SHELL=/bin/zsh\nSHELL=/bin/bash\n'
+  setup.missing = []
+  await $.tool.call({ tool: 'Bash', command })
 
   expect(setup.logged?.[0]).toContain("│ It's done")
   expect(setup.logged?.[1]).toContain(command)
+  expect(setup.logged?.[2]).toContain(command)
+  expect(setup.logged?.[3]).toContain("│ It's done")
 })

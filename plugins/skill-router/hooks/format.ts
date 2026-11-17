@@ -63,9 +63,10 @@ function heredocSub(src: string, start: number, zsh: boolean): { text: string; l
 }
 
 // Unquoted characters whose meaning never depends on the shell. `#` starts a
-// comment, and in zsh `=` expands to a command's path, only at the start of
-// a word, which is checked apart.
-const LITERAL = /[A-Za-z0-9._/@+#=:,%-]/
+// `#` is left out: it starts a comment, and with zsh's extendedglob it is a
+// glob anywhere. `=` is checked apart: at the start of a word zsh expands
+// `=ls` to a path, and with magicequalsubst so does `a==ls`.
+const LITERAL = /[A-Za-z0-9._/@+:,%-]/
 
 // The words a simple command passes, as the shell would pass them, or
 // undefined when any of them depends on the shell at run time (a variable, a
@@ -74,9 +75,13 @@ export function shellWords(command: string, zsh = false): string[] | undefined {
   const src = command.trim()
   const words: string[] = []
   let word: string | undefined
+  let afterEquals = false
   let i = 0
   while (i < src.length) {
     const c = src.charAt(i)
+    const equals = c === '='
+    if (equals && (word === undefined || afterEquals)) return undefined
+    afterEquals = equals
     if (c === ' ' || c === '\t') {
       if (word !== undefined) words.push(word)
       word = undefined
@@ -88,7 +93,8 @@ export function shellWords(command: string, zsh = false): string[] | undefined {
       i += 2
     } else if (c === "'") {
       const end = src.indexOf("'", i + 1)
-      if (end === -1) return undefined
+      // With zsh's rcquotes, `'it''s'` is one string holding a quote.
+      if (end === -1 || src.charAt(end + 1) === "'") return undefined
       word = (word ?? '') + src.slice(i + 1, end)
       i = end + 1
     } else if (c === '"') {
@@ -96,7 +102,7 @@ export function shellWords(command: string, zsh = false): string[] | undefined {
       if (quoted === undefined) return undefined
       word = (word ?? '') + quoted.text
       i = quoted.end + 1
-    } else if (LITERAL.test(c) && !((c === '#' || c === '=') && word === undefined)) {
+    } else if (LITERAL.test(c) || equals) {
       word = (word ?? '') + c
       i++
     } else {
