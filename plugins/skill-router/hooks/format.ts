@@ -212,6 +212,17 @@ const SPECS: Readonly<Record<string, Spec>> = {
 
 const BLOCKS = new Set(['Body', 'Description'])
 
+// az's true/false flags (nargs '?'): bare they mean true, and they take the
+// next word only when it isn't a flag.
+const AZ_OPTIONAL = new Set(['Detect', 'Draft', 'Auto-complete', 'Squash', 'Delete source branch', 'Bypass policy', 'Transition work items'])
+
+// Azure CLI replaces a word that starts with `@`, or whose part after its
+// first `=` does, with that file's contents before parsing it.
+function azReadsFile(word: string): boolean {
+  const eq = word.indexOf('=')
+  return word.startsWith('@') || (eq >= 0 && word.slice(eq + 1).startsWith('@'))
+}
+
 // Control characters could move the cursor or recolor the transcript, and so
 // redraw what the person reads; they are shown as escapes instead.
 // Bidi overrides, zero-width, filler and tag characters reorder or hide
@@ -244,6 +255,8 @@ function formatCli(words: readonly string[]): Shown | undefined {
   const name = SPECS[four] !== undefined ? four : words.slice(0, 3).join(' ')
   const spec = SPECS[name]
   if (spec === undefined) return undefined
+  const az = name.startsWith('az ')
+  if (az && words.some(azReadsFile)) return undefined
   const rows: [string, string][] = []
   const blocks: string[] = []
   const notes: string[] = []
@@ -265,14 +278,16 @@ function formatCli(words: readonly string[]): Shown | undefined {
         const parts: string[] = []
         while (i + 1 < words.length && !(words[i + 1] ?? '').startsWith('-')) parts.push(words[++i] ?? '')
         value = parts.length > 0 ? parts.join('\n') : undefined
+      } else if (az && AZ_OPTIONAL.has(field) && (words[i + 1] ?? '-').startsWith('-')) {
+        value = 'true'
       } else {
         value = words[++i]
       }
       // gh and az keep only the last of a repeated flag; showing both would
       // show text that never gets posted.
       if (value === undefined || values[field] !== undefined) return undefined
-      // az reads a value that starts with `@` from that file instead.
-      if (name.startsWith('az ') && /(^|\n)@/.test(value)) return undefined
+      // argparse reads a word starting with `-` as the next flag, not a value.
+      if (az && eq < 0 && value.startsWith('-')) return undefined
       values[field] = value
       if (field === 'Body file') bodyFiles.push(value)
       if (BLOCKS.has(field)) blocks.push(block(field, value))
@@ -290,9 +305,12 @@ function formatCli(words: readonly string[]): Shown | undefined {
   }
   if (target !== undefined && spec.target !== undefined) rows.unshift([spec.target, target])
   if (notes.length > 0) rows.push([name === 'gh pr review' ? 'Review' : 'Also', notes.join(', ')])
-  const pr = values['PR']
+  // What the call does goes in the dialog's one line too: a phone card may
+  // show nothing else.
   const title = values['Title']
-  const head = [name, pr, title === undefined ? undefined : `"${oneLine(title)}"`].filter(p => p !== undefined).join(' ')
+  const head = [name, values['PR'], values['Vote'], values['Status'], values['Method'], values['Resource'], title === undefined ? undefined : `"${oneLine(title)}"`]
+    .filter(p => p !== undefined)
+    .join(' ')
   return { text: [name, ...fields(rows), ...blocks].join('\n'), head: oneLine(head), bodyFiles, name, values }
 }
 

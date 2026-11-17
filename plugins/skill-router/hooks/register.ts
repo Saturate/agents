@@ -122,6 +122,9 @@ function plainCall(command: string, gates: readonly Rule[]): boolean {
   const gatedEverywhere = commandSegments(command).filter(s => isGated(gates, s)).length
   if (outer.filter(s => isGated(gates, s)).length !== gatedEverywhere) return false
   return outer.every(segment => {
+    // Azure CLI reads `@file` words as more arguments, so az is scoped only
+    // through azScope.
+    if (/^\s*az\s/.test(segment)) return false
     const gate = gates.find(g => g.target === 'command' && g.pattern.test(segment))
     const match = gate?.pattern.exec(segment)
     return match !== undefined && match !== null && plainArgs(segment.slice(match.index + match[0].length))

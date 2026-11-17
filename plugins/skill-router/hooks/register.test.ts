@@ -594,3 +594,13 @@ test('an az PR update is laid out with its description as a block', async ($, on
   expect(setup.logged?.[0]).toContain('az repos pr update\n  PR             12\n  Title          Fix login\n  Auto-complete  true\n  Description\n  │ First line\n  │ Second line')
   expect(setup.asked[0]).toContain('`az repos pr update 12 "Fix login"`')
 })
+
+test('an az command never gets always allow from its plain arguments alone', async ($, on) => {
+  const setup: Setup = { answer: "Don't run", ran: [], asked: [], offered: [], remote: ADO_REMOTE, azShown: [] }
+  engine(on, setup)
+
+  await $.tool.call({ tool: 'Bash', command: 'az repos pr update @a 4242 @b completed' })
+
+  expect(setup.offered?.[0]).not.toContain('Always')
+  expect(setup.azShown).toEqual([])
+})
