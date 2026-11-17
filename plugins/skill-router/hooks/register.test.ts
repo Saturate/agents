@@ -29,6 +29,7 @@ type Setup = {
   env?: string
   files?: Record<string, string>
   failing?: 'store' | 'repo' | 'cwd'
+  sessionId?: string
 }
 
 function engine(on: Parameters<Parameters<typeof test>[1]>[1], setup: Setup) {
@@ -49,6 +50,7 @@ function engine(on: Parameters<Parameters<typeof test>[1]>[1], setup: Setup) {
     if (setup.failing === 'cwd') throw new Error('cwd lookup failed')
     return { value: '/repo' }
   })
+  on('session.id', () => ({ value: setup.sessionId ?? 's1' }))
   on('command.list', () => ({ value: [{ name: 'commit', description: '', source: 'user' }] }))
   if (setup.failing === 'store') {
     on('store.get', () => {
@@ -478,4 +480,28 @@ test('the dialog names the call by its fields, not the raw command', async ($, o
   expect(setup.logged?.[0]).toContain('gh pr review\n  PR      7\n  Review  Approve\n  Body\n  │ Looks good.\n  │ \n  │ Ship it.')
   expect(setup.asked[0]).toContain('`gh pr review 7`')
   expect(setup.logged?.[1]).toContain('ado repo_pull_request_thread_write\n  project       P\n  repositoryId  web\n  content\n  │ line one\n  │ line two')
+})
+
+test('a body file is read from the exact path gh gets', async ($, on) => {
+  const setup: Setup = { answer: "Don't run", ran: [], asked: [], logged: [], files: { '/repo/ab.md': 'REAL', '/repo/a': 'DECOY' } }
+  engine(on, setup)
+
+  await $.tool.call({ tool: 'Bash', command: 'gh pr comment 1 --body-file "a"b.md' })
+
+  expect(setup.logged?.[0]).toContain('REAL')
+  expect(setup.logged?.[0]).not.toContain('DECOY')
+})
+
+test('a session allow does not reach another session', async ($, on) => {
+  const setup: Setup = { answer: 'Allow for this session', ran: [], asked: [] }
+  engine(on, setup)
+
+  await $.tool.call({ tool: 'Bash', command: 'gh pr comment 1 --body "a"' })
+  setup.sessionId = 's2'
+  setup.answer = "Don't run"
+  await $.tool.call({ tool: 'Bash', command: 'gh pr comment 2 --body "b"' })
+  setup.sessionId = 's1'
+  await $.command.run({ command: 'gates', args: 'reset' })
+
+  expect(setup.asked.length).toBe(2)
 })

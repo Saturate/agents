@@ -64,8 +64,14 @@ function listSkills(skills: readonly string[]): string {
 
 const STORE_KEY = 'allowed-gates'
 
-// Allows that last until the session ends, by scope; never written down.
+// Allows that last until the session ends, never written down. Keyed by
+// sessionKey: one hooks module can serve several sessions (teammates).
 const sessionAllowed = new Map<string, Set<string>>()
+
+async function sessionKey($: EngineInterface, scope: string | undefined): Promise<string | undefined> {
+  if (scope === undefined) return undefined
+  return $.session.id().then(id => `${id}\n${scope}`, () => undefined)
+}
 
 // Force pushes and hard resets are judged per command, never per project.
 // A fork names its target as a plain argument anywhere among its flags, and
@@ -190,9 +196,9 @@ async function readAllowed($: EngineInterface): Promise<Map<string, Set<string>>
 
 // A failed lookup means "nothing allowed": the gates ask, instead of the
 // whole hook failing open and every rule going quiet.
-async function allowedIn($: EngineInterface, scope: string | undefined): Promise<Set<string>> {
+async function allowedIn($: EngineInterface, scope: string | undefined, session: string | undefined): Promise<Set<string>> {
   if (scope === undefined) return new Set()
-  const forSession = sessionAllowed.get(scope) ?? new Set()
+  const forSession = (session === undefined ? undefined : sessionAllowed.get(session)) ?? new Set()
   try {
     return new Set([...forSession, ...((await readAllowed($)).get(scope) ?? [])])
   } catch {
@@ -200,10 +206,10 @@ async function allowedIn($: EngineInterface, scope: string | undefined): Promise
   }
 }
 
-function allowForSession(scope: string, gates: readonly Rule[]): void {
-  const ids = sessionAllowed.get(scope) ?? new Set()
+function allowForSession(session: string, gates: readonly Rule[]): void {
+  const ids = sessionAllowed.get(session) ?? new Set()
   for (const gate of gates) ids.add(ruleId(gate))
-  sessionAllowed.set(scope, ids)
+  sessionAllowed.set(session, ids)
 }
 
 async function allowGates($: EngineInterface, scope: string, gates: readonly Rule[]): Promise<void> {
@@ -217,21 +223,23 @@ async function allowGates($: EngineInterface, scope: string, gates: readonly Rul
 const BODY_FILE = /(?:^|\s)(?:--body-file|-F)(?:=|\s+)?(?:"([^"]+)"|'([^']+)'|([^\s;&|]+))/g
 
 // `gh issue create --body-file notes.md` shows nothing of what gets posted,
-// so the file's text is added to the preview. A path that depends on an
-// earlier `cd` or a shell expansion is named but not read: guessing it could
-// show a different file from the one that gets posted.
-async function bodyFiles($: EngineInterface, command: string, gates: readonly Rule[]): Promise<string> {
-  const moved = outerSegments(command).some(s => !isGated(gates, s))
+// so the file's text is added to the preview. Where the command's words were
+// read exactly, those are the paths; otherwise they are guessed from the
+// text, and a path that depends on an earlier `cd` or a shell expansion is
+// named but not read, since guessing it could show a different file.
+async function bodyFiles($: EngineInterface, command: string, shown: Shown, gates: readonly Rule[]): Promise<string> {
+  const exact = shown.bodyFiles !== undefined
+  const moved = !exact && outerSegments(command).some(s => !isGated(gates, s))
+  const paths = shown.bodyFiles ?? [...command.matchAll(BODY_FILE)].map(m => m[1] ?? m[2] ?? m[3] ?? '')
   const parts: string[] = []
-  for (const m of command.matchAll(BODY_FILE)) {
-    const path = m[1] ?? m[2] ?? m[3]
-    if (!path || path === '-') continue
+  for (const path of paths) {
+    if (path === '' || path === '-') continue
     // A device such as /dev/stdin could block the read.
     if (path.startsWith('/dev/')) {
       parts.push(`  Body file ${path} (not read)`)
       continue
     }
-    if (/^[~$]/.test(path) || (moved && !path.startsWith('/'))) {
+    if ((!exact && /^[~$]/.test(path)) || (moved && !path.startsWith('/'))) {
       parts.push(`  Body file ${path} (not read: its location depends on the shell)`)
       continue
     }
@@ -250,9 +258,10 @@ async function bodyFiles($: EngineInterface, command: string, gates: readonly Ru
 // preview box, so the full command goes into the transcript as its own row
 // just above the dialog, where it is drawn whole instead of squashed into
 // the question line.
-async function approve($: EngineInterface, gates: readonly Rule[], shown: Shown, scope: string | undefined): Promise<string | undefined> {
+async function approve($: EngineInterface, gates: readonly Rule[], shown: Shown, scope: string | undefined, session: string | undefined): Promise<string | undefined> {
   const messages = gates.map(g => g.message).join(' ')
   const canAlways = scope !== undefined && !gates.some(neverAlways)
+  const canSession = canAlways && session !== undefined
   $.ui.log(`skill-router asks before running this:\n\n${preview(shown.text)}`)
   let answer: string | undefined
   try {
@@ -261,15 +270,15 @@ async function approve($: EngineInterface, gates: readonly Rule[], shown: Shown,
     const head = shown.head.slice(0, 200).replaceAll('`', "'")
     answer = await $.ui.ask(`${messages} Run \`${head}\` (full text shown above)?`, {
       header: 'Approve',
-      options: canAlways ? [RUN, SESSION, ALWAYS, DONT_RUN] : [RUN, DONT_RUN],
+      options: [RUN, ...(canSession ? [SESSION] : []), ...(canAlways ? [ALWAYS] : []), DONT_RUN],
     })
   } catch {
     answer = undefined
   }
   if (answer === undefined) return `${messages} The approval dialog was dismissed, or nobody was here to answer it, so it was not run.`
   if (answer === RUN) return undefined
-  if (answer === SESSION && canAlways) {
-    allowForSession(scope, gates)
+  if (answer === SESSION && canSession) {
+    allowForSession(session, gates)
     return undefined
   }
   if (answer === ALWAYS && canAlways) {
@@ -295,6 +304,7 @@ export const register: Register = on => {
   on('command.run', { command: 'gates' }, async ($, e) => {
     let allowed: Map<string, Set<string>>
     let all: Rule[]
+    let prefix: string | undefined
     try {
       if (e.args.trim() === 'reset') {
         sessionAllowed.clear()
@@ -303,6 +313,7 @@ export const register: Register = on => {
       }
       allowed = await readAllowed($)
       all = await loadRules($)
+      prefix = await $.session.id().then(id => `${id}\n`, () => undefined)
     } catch {
       return { text: 'could not read or reset the allow list.' }
     }
@@ -315,7 +326,9 @@ export const register: Register = on => {
       return lines
     }
     const always = list(allowed)
-    const session = list(sessionAllowed)
+    const mine = new Map<string, Set<string>>()
+    for (const [key, ids] of sessionAllowed) if (prefix !== undefined && key.startsWith(prefix)) mine.set(key.slice(prefix.length), ids)
+    const session = list(mine)
     if (always.length === 0 && session.length === 0) return { text: 'no gates are always allowed.' }
     return {
       text: [
@@ -355,7 +368,7 @@ export const register: Register = on => {
   })
   on('session.end', ($, e, next) => {
     loaded.clear()
-    sessionAllowed.clear()
+    for (const key of sessionAllowed.keys()) if (key.startsWith(`${e.sessionId}\n`)) sessionAllowed.delete(key)
     return next(e)
   })
 
@@ -379,14 +392,15 @@ export const register: Register = on => {
       try {
         // Without a scope the dialog still asks, just without "always".
         const scope = await scopeOf($, e, command, verdict.gates).catch(() => undefined)
-        const allowed = await allowedIn($, scope)
+        const session = await sessionKey($, scope)
+        const allowed = await allowedIn($, scope, session)
         const asking = verdict.gates.filter(g => neverAlways(g) || !allowed.has(ruleId(g)))
         const formatted = command !== undefined ? formatCommand(command) : formatTool(e)
         if (asking.length === 0) {
           $.ui.log(`skill-router: allowed in ${scope ?? 'this project'} (/gates to review):\n\n${preview(formatted.text)}`)
         } else {
-          const files = command !== undefined ? await bodyFiles($, command, verdict.gates) : ''
-          refusal = await approve($, asking, { ...formatted, text: [formatted.text, files].filter(t => t.length > 0).join('\n') }, scope)
+          const files = command !== undefined ? await bodyFiles($, command, formatted, verdict.gates) : ''
+          refusal = await approve($, asking, { ...formatted, text: [formatted.text, files].filter(t => t.length > 0).join('\n') }, scope, session)
         }
       } catch (error) {
         refusal = `skill-router could not finish asking about this, so it was not run (${error instanceof Error ? error.message : String(error)}).`

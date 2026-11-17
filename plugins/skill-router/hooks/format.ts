@@ -8,10 +8,40 @@ export type Shown = {
   text: string
   // One line naming the call, for the dialog's question.
   head: string
+  // The `--body-file` paths gh will read, when the words were read exactly.
+  bodyFiles?: readonly string[]
 }
 
-// The body of `"$(cat <<'EOF' ... EOF)"`, how Claude passes multi-line text.
-const HEREDOC_SUB = /^\$\(\s*cat\s+<<(-?)\s*(['"]?)([A-Za-z_][A-Za-z0-9_]*)\2[ \t]*\n([\s\S]*?)\n[ \t]*\3[ \t]*\n?\s*\)/
+// The opener of `"$(cat <<'EOF' ... EOF)"`, how Claude passes multi-line text.
+const HEREDOC_OPEN = /^\$\([ \t]*cat[ \t]+<<(-?)[ \t]*(['"]?)([A-Za-z_][A-Za-z0-9_]*)\2[ \t]*\n/
+
+// The text a quoted heredoc substitution at `start` produces, and its length.
+// The body ends at the first line that is exactly the delimiter, as in the
+// shell; anything after that line other than the closing `)` would run as
+// commands, so it is not read.
+function heredocSub(src: string, start: number): { text: string; length: number } | undefined {
+  const open = HEREDOC_OPEN.exec(src.slice(start))
+  if (!open) return undefined
+  const [opener, dash = '', quote = '', delimiter = ''] = open
+  const lines: string[] = []
+  let at = start + opener.length
+  for (;;) {
+    const nl = src.indexOf('\n', at)
+    if (nl === -1) return undefined
+    const raw = src.slice(at, nl)
+    const line = dash === '-' ? raw.replace(/^\t+/, '') : raw
+    at = nl + 1
+    if (line === delimiter) break
+    lines.push(line)
+  }
+  const close = /^[ \t\n]*\)/.exec(src.slice(at))
+  if (!close) return undefined
+  const body = lines.join('\n')
+  // An unquoted delimiter expands `$x` and backticks in the body.
+  if (quote === '' && /[$`\\]/.test(body)) return undefined
+  // A substitution drops every trailing newline of its output.
+  return { text: body.replace(/\n+$/, ''), length: at + close[0].length - start }
+}
 
 // Unquoted characters whose meaning never depends on the shell. `#` starts a
 // comment only at the start of a word, which is checked apart.
@@ -76,13 +106,10 @@ function doubleQuoted(src: string, start: number): { text: string; end: number }
         j++
       }
     } else if (d === '$') {
-      const h = HEREDOC_SUB.exec(src.slice(j))
-      if (!h) return undefined
-      const [whole, dash = '', quote = '', , body = ''] = h
-      // An unquoted delimiter expands `$x` and backticks in the body.
-      if (quote === '' && /[$`\\]/.test(body)) return undefined
-      text += dash === '-' ? body.replace(/^\t+/gm, '') : body
-      j += whole.length
+      const sub = heredocSub(src, j)
+      if (!sub) return undefined
+      text += sub.text
+      j += sub.length
     } else {
       text += d
       j++
@@ -123,8 +150,9 @@ const GH: Readonly<Record<string, Spec>> = {
 
 // Control characters could move the cursor or recolor the transcript, and so
 // redraw what the person reads; they are shown as escapes instead.
+// Bidi overrides and zero-width characters reorder or hide text the same way.
 function visible(text: string): string {
-  return text.replace(/[\u0000-\u0008\u000b-\u001f\u007f-\u009f]/g, c => `\\x${c.charCodeAt(0).toString(16).padStart(2, '0')}`)
+  return text.replace(/[\u0000-\u0008\u000b-\u001f\u007f-\u009f\u200b-\u200f\u2028-\u202e\u2060-\u2069\ufeff]/g, c => `\\u{${c.charCodeAt(0).toString(16)}}`)
 }
 
 function oneLine(text: string): string {
@@ -150,6 +178,8 @@ function formatGh(words: readonly string[]): Shown | undefined {
   const rows: [string, string][] = []
   const blocks: string[] = []
   const notes: string[] = []
+  const bodyFiles: string[] = []
+  const seen = new Set<string>()
   let target: string | undefined
   let title: string | undefined
   for (let i = 3; i < words.length; i++) {
@@ -159,7 +189,11 @@ function formatGh(words: readonly string[]): Shown | undefined {
     const field = spec.values[flag]
     if (field !== undefined) {
       const value = eq > 0 ? word.slice(eq + 1) : words[++i]
-      if (value === undefined) return undefined
+      // gh keeps only the last of a repeated flag; showing both would show
+      // text that never gets posted.
+      if (value === undefined || seen.has(field)) return undefined
+      seen.add(field)
+      if (field === 'Body file') bodyFiles.push(value)
       if (field === 'Body') blocks.push(block('Body', value))
       else rows.push([field, value])
       if (field === 'Title') title = value
@@ -176,7 +210,7 @@ function formatGh(words: readonly string[]): Shown | undefined {
   const head = [`gh ${name}`, target, title === undefined ? undefined : `"${oneLine(title)}"`].filter(p => p !== undefined).join(' ')
   if (target !== undefined && spec.target !== undefined) rows.unshift([spec.target, target])
   if (notes.length > 0) rows.push([spec === GH['pr review'] ? 'Review' : 'Also', notes.join(', ')])
-  return { text: [`gh ${name}`, ...fields(rows), ...blocks].join('\n'), head: oneLine(head) }
+  return { text: [`gh ${name}`, ...fields(rows), ...blocks].join('\n'), head: oneLine(head), bodyFiles }
 }
 
 export function formatCommand(command: string): Shown {
@@ -190,13 +224,16 @@ const NOT_INPUT = new Set(['tool', 'tool_use_id', 'agentId', 'consent', 'request
 // An MCP call's arguments as fields; long or multi-line text as a block.
 export function formatTool(e: object & { tool: string }): Shown {
   const [, server = '', name = e.tool] = e.tool.split('__')
+  const head = `${server} ${name}`
   const rows: [string, string][] = []
   const blocks: string[] = []
   for (const [key, value] of Object.entries(e)) {
     if (NOT_INPUT.has(key) || value === undefined) continue
+    // A key is drawn as a label; one that isn't a plain name could pass for
+    // another row, so the call is shown as JSON instead.
+    if (!/^[A-Za-z0-9_]+$/.test(key)) return { text: JSON.stringify(e, null, 2), head }
     if (typeof value === 'string' && (value.includes('\n') || value.length > 80)) blocks.push(block(key, value))
     else rows.push([key, typeof value === 'string' ? value : JSON.stringify(value)])
   }
-  const head = `${server} ${name}`
   return { text: [head, ...fields(rows), ...blocks].join('\n'), head }
 }
