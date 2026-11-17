@@ -24,16 +24,17 @@ flowchart TB
     ASK -->|"Yes"| PASS
     ASK -->|"No, or claude -p"| DENY2
 
-    subgraph gates["Gate Rules · 9 rules"]
+    subgraph gates["Gate Rules · 10 rules"]
         G1["draft-first\n^\sgh\s+issue\s+create"]
         G2["draft-first\n^\sgh\s+pr\s+review"]
         G3["draft-first\n^\sgh\s+pr\s+comment"]
-        G4["draft-first\n^\saz\s+repos\s+pr\s+create\s+-+thread"]
-        G5["confirm-destructive\n^\sgit\s+push(\s+.*)?[[:space:]](-[a-z]*"]
-        G6["confirm-destructive\n^\sgit\s+reset\s+--hard"]
-        G7["confirm-external\n^\sgh\s+repo\s+fork"]
-        G8["confirm-external\n^mcp__.+__(repo_create_pull_request|repo"]
-        G9["draft-first\n^mcp__.+__(repo_pull_request_thread_writ"]
+        G4["confirm-destructive\n^\sgit\s+push(\s+.*)?[[:space:]](-[a-z]*"]
+        G5["confirm-destructive\n^\sgit\s+reset\s+--hard"]
+        G6["confirm-external\n^\saz\s+repos\s+pr\s+(set-vote|update)"]
+        G7["confirm-each\n^\saz\s+devops\s+invoke"]
+        G8["confirm-each\n^\sgh\s+repo\s+fork"]
+        G9["confirm-external\n^mcp__.+__(repo_create_pull_request|repo"]
+        G10["draft-first\n^mcp__.+__(repo_pull_request_thread_writ"]
     end
 
     subgraph blocks["Block Rules · 10 rules"]

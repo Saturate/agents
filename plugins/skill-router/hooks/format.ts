@@ -10,6 +10,9 @@ export type Shown = {
   head: string
   // The `--body-file` paths gh will read, when the words were read exactly.
   bodyFiles?: readonly string[]
+  // The command (`az repos pr update`) and its fields, when read exactly.
+  name?: string
+  values?: Readonly<Record<string, string>>
 }
 
 // The opener of `"$(cat <<'EOF' ... EOF)"`, how Claude passes multi-line text.
@@ -146,6 +149,8 @@ function doubleQuoted(src: string, start: number, zsh: boolean): { text: string;
 type Spec = {
   // Value flags and the field each fills.
   values: Readonly<Record<string, string>>
+  // Flags that take every following word up to the next flag (az's nargs).
+  multi?: Readonly<Record<string, string>>
   // Flags without a value and what each means.
   bools: Readonly<Record<string, string>>
   // Label of the positional argument, or undefined when none is taken.
@@ -154,24 +159,58 @@ type Spec = {
 
 const BODY = { '--body': 'Body', '-b': 'Body', '--body-file': 'Body file', '-F': 'Body file', '--repo': 'Repo', '-R': 'Repo' }
 
+// Arguments every az command takes.
+const AZ_VALUES = { '--org': 'Org', '--organization': 'Org', '--detect': 'Detect', '--output': 'Output', '-o': 'Output', '--query': 'Query', '--subscription': 'Subscription' }
+const AZ_BOOLS = { '--only-show-errors': 'Only errors', '--debug': 'Debug', '--verbose': 'Verbose' }
+
 // gh reuses short flags per command (`-a` is --assignee for an issue and
 // --approve for a review), so each command has its own table.
-const GH: Readonly<Record<string, Spec>> = {
-  'pr comment': {
+const SPECS: Readonly<Record<string, Spec>> = {
+  'gh pr comment': {
     values: BODY,
     bools: { '--edit-last': 'Edits your last comment', '--delete-last': 'Deletes your last comment', '--create-if-none': 'Creates one if none exists', '--yes': 'Skips confirmation', '--web': 'Opens the browser', '-w': 'Opens the browser', '--editor': 'Opens an editor', '-e': 'Opens an editor' },
     target: 'PR',
   },
-  'pr review': {
+  'gh pr review': {
     values: BODY,
     bools: { '--approve': 'Approve', '-a': 'Approve', '--request-changes': 'Request changes', '-r': 'Request changes', '--comment': 'Comment', '-c': 'Comment' },
     target: 'PR',
   },
-  'issue create': {
+  'gh issue create': {
     values: { ...BODY, '--title': 'Title', '-t': 'Title', '--assignee': 'Assignees', '-a': 'Assignees', '--label': 'Labels', '-l': 'Labels', '--milestone': 'Milestone', '-m': 'Milestone', '--project': 'Project', '-p': 'Project', '--template': 'Template', '-T': 'Template' },
     bools: { '--web': 'Opens the browser', '-w': 'Opens the browser', '--editor': 'Opens an editor', '-e': 'Opens an editor' },
   },
+  'az repos pr set-vote': {
+    values: { ...AZ_VALUES, '--id': 'PR', '--vote': 'Vote' },
+    bools: AZ_BOOLS,
+  },
+  'az repos pr update': {
+    values: {
+      ...AZ_VALUES,
+      '--id': 'PR',
+      '--title': 'Title',
+      '--status': 'Status',
+      '--draft': 'Draft',
+      '--auto-complete': 'Auto-complete',
+      '--squash': 'Squash',
+      '--delete-source-branch': 'Delete source branch',
+      '--merge-commit-message': 'Merge message',
+      '--transition-work-items': 'Transition work items',
+      '--bypass-policy': 'Bypass policy',
+      '--bypass-policy-reason': 'Bypass reason',
+    },
+    // az joins the words of a description with newlines.
+    multi: { '--description': 'Description', '-d': 'Description' },
+    bools: AZ_BOOLS,
+  },
+  'az devops invoke': {
+    values: { ...AZ_VALUES, '--area': 'Area', '--resource': 'Resource', '--http-method': 'Method', '--api-version': 'API version', '--in-file': 'Body file', '--out-file': 'Out file', '--media-type': 'Media type', '--accept-media-type': 'Accept' },
+    multi: { '--route-parameters': 'Route', '--query-parameters': 'Query parameters' },
+    bools: AZ_BOOLS,
+  },
 }
+
+const BLOCKS = new Set(['Body', 'Description'])
 
 // Control characters could move the cursor or recolor the transcript, and so
 // redraw what the person reads; they are shown as escapes instead.
@@ -200,53 +239,68 @@ function fields(rows: readonly (readonly [string, string])[]): string[] {
   return rows.map(([k, v]) => `  ${k.padEnd(width)}  ${oneLine(v)}`)
 }
 
-function formatGh(words: readonly string[]): Shown | undefined {
-  const name = `${words[1] ?? ''} ${words[2] ?? ''}`
-  const spec = GH[name]
-  if (words[0] !== 'gh' || spec === undefined) return undefined
+function formatCli(words: readonly string[]): Shown | undefined {
+  const four = words.slice(0, 4).join(' ')
+  const name = SPECS[four] !== undefined ? four : words.slice(0, 3).join(' ')
+  const spec = SPECS[name]
+  if (spec === undefined) return undefined
   const rows: [string, string][] = []
   const blocks: string[] = []
   const notes: string[] = []
   const bodyFiles: string[] = []
-  const seen = new Set<string>()
+  const values: Record<string, string> = {}
   let target: string | undefined
-  let title: string | undefined
-  for (let i = 3; i < words.length; i++) {
+  for (let i = name.split(' ').length; i < words.length; i++) {
     const word = words[i] ?? ''
     const eq = word.startsWith('--') ? word.indexOf('=') : -1
     const flag = eq > 0 ? word.slice(0, eq) : word
-    const field = spec.values[flag]
+    const single = spec.values[flag]
+    const many = spec.multi?.[flag]
+    const field = single ?? many
     if (field !== undefined) {
-      const value = eq > 0 ? word.slice(eq + 1) : words[++i]
-      // gh keeps only the last of a repeated flag; showing both would show
-      // text that never gets posted.
-      if (value === undefined || seen.has(field)) return undefined
-      seen.add(field)
+      let value: string | undefined
+      if (eq > 0) {
+        value = word.slice(eq + 1)
+      } else if (many !== undefined) {
+        const parts: string[] = []
+        while (i + 1 < words.length && !(words[i + 1] ?? '').startsWith('-')) parts.push(words[++i] ?? '')
+        value = parts.length > 0 ? parts.join('\n') : undefined
+      } else {
+        value = words[++i]
+      }
+      // gh and az keep only the last of a repeated flag; showing both would
+      // show text that never gets posted.
+      if (value === undefined || values[field] !== undefined) return undefined
+      // az reads a value that starts with `@` from that file instead.
+      if (name.startsWith('az ') && /(^|\n)@/.test(value)) return undefined
+      values[field] = value
       if (field === 'Body file') bodyFiles.push(value)
-      if (field === 'Body') blocks.push(block('Body', value))
+      if (BLOCKS.has(field)) blocks.push(block(field, value))
       else rows.push([field, value])
-      if (field === 'Title') title = value
     } else if (spec.bools[flag] !== undefined && eq < 0) {
       notes.push(spec.bools[flag] ?? '')
     } else if (!word.startsWith('-') && spec.target !== undefined && target === undefined) {
       target = word
+      values[spec.target] = word
     } else {
       // An unknown flag might take the next word as its value; rather than
       // guess and label that word wrongly, show the command as written.
       return undefined
     }
   }
-  const head = [`gh ${name}`, target, title === undefined ? undefined : `"${oneLine(title)}"`].filter(p => p !== undefined).join(' ')
   if (target !== undefined && spec.target !== undefined) rows.unshift([spec.target, target])
-  if (notes.length > 0) rows.push([spec === GH['pr review'] ? 'Review' : 'Also', notes.join(', ')])
-  return { text: [`gh ${name}`, ...fields(rows), ...blocks].join('\n'), head: oneLine(head), bodyFiles }
+  if (notes.length > 0) rows.push([name === 'gh pr review' ? 'Review' : 'Also', notes.join(', ')])
+  const pr = values['PR']
+  const title = values['Title']
+  const head = [name, pr, title === undefined ? undefined : `"${oneLine(title)}"`].filter(p => p !== undefined).join(' ')
+  return { text: [name, ...fields(rows), ...blocks].join('\n'), head: oneLine(head), bodyFiles, name, values }
 }
 
 // `zsh`: the command runs under zsh, which reads a heredoc body as written;
 // anything else is read the way macOS's bash 3.2 would.
 export function formatCommand(command: string, zsh = false): Shown {
   const words = shellWords(command, zsh)
-  const formatted = words === undefined ? undefined : formatGh(words)
+  const formatted = words === undefined ? undefined : formatCli(words)
   return formatted ?? { text: command, head: oneLine(command.split('\n')[0] ?? '') }
 }
 

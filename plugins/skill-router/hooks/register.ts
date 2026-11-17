@@ -73,11 +73,11 @@ async function sessionKey($: EngineInterface, scope: string | undefined): Promis
   return $.session.id().then(id => `${id}\n${scope}`, () => undefined)
 }
 
-// Force pushes and hard resets are judged per command, never per project.
-// A fork names its target as a plain argument anywhere among its flags, and
-// forking this repo happens once anyway.
+// Force pushes and hard resets are judged per command, never per project,
+// and so is anything a rule marks confirm-each (a fork names its target as a
+// plain argument anywhere among its flags, and happens once anyway).
 function neverAlways(gate: Rule): boolean {
-  return gate.skills.includes('confirm-destructive') || (gate.target === 'command' && gate.skills.includes('confirm-external'))
+  return gate.skills.includes('confirm-destructive') || gate.skills.includes('confirm-each')
 }
 
 // "Always" covers only calls whose every word is known not to pick another
@@ -191,12 +191,30 @@ function stringArg(e: object, name: string): string | undefined {
   return typeof value === 'string' ? value : undefined
 }
 
+// Fields that point az at another organization or let a PR skip policy.
+const AZ_ELSEWHERE = ['Org', 'Detect', 'Subscription', 'Bypass policy', 'Bypass reason']
+
+// An az PR command names its PR by an id that is unique across the whole
+// organization, not by repo. It is scoped to this repo only when az, asked
+// the way the command will ask it (same directory, same detection), says
+// that PR lives in the repo this directory's one remote points at.
+async function azScope($: EngineInterface, shown: Shown): Promise<string | undefined> {
+  if (shown.name !== 'az repos pr set-vote' && shown.name !== 'az repos pr update') return undefined
+  const values = shown.values ?? {}
+  const id = values['PR']
+  if (id === undefined || !/^\d+$/.test(id) || AZ_ELSEWHERE.some(k => values[k] !== undefined)) return undefined
+  const remote = await soleRemote($)
+  if (remote === undefined) return undefined
+  const { exitCode, stdout } = await $.process.run(['az', 'repos', 'pr', 'show', '--id', id, '--query', 'repository.webUrl', '-o', 'tsv'], { cwd: await $.session.cwd() })
+  return exitCode === 0 && normalizeRemote(stdout) === remote ? remote : undefined
+}
+
 // The scope an "always allow" covers, or undefined when the call can't be
 // tied to one. A Bash command is scoped to the repo it runs in; an MCP call
 // names its own Azure DevOps project and repo, which may not be this one.
-async function scopeOf($: EngineInterface, e: object & { tool: string }, command: string | undefined, gates: readonly Rule[]): Promise<string | undefined> {
+async function scopeOf($: EngineInterface, e: object & { tool: string }, command: string | undefined, shown: Shown, gates: readonly Rule[]): Promise<string | undefined> {
   if (command !== undefined) {
-    return plainCall(command, gates) ? soleRemote($) : undefined
+    return plainCall(command, gates) ? soleRemote($) : azScope($, shown)
   }
   // Bypassing branch policy is a decision about that one PR.
   if (Reflect.get(e, 'bypassPolicy') === true) return undefined
@@ -414,11 +432,11 @@ export const register: Register = on => {
       let refusal: string | undefined
       try {
         // Without a scope the dialog still asks, just without "always".
-        const scope = await scopeOf($, e, command, verdict.gates).catch(() => undefined)
+        const formatted = command !== undefined ? formatCommand(command, await runsUnderZsh($)) : formatTool(e)
+        const scope = await scopeOf($, e, command, formatted, verdict.gates).catch(() => undefined)
         const session = await sessionKey($, scope)
         const allowed = await allowedIn($, scope, session)
         const asking = verdict.gates.filter(g => neverAlways(g) || !allowed.has(ruleId(g)))
-        const formatted = command !== undefined ? formatCommand(command, await runsUnderZsh($)) : formatTool(e)
         if (asking.length === 0) {
           $.ui.log(`skill-router: allowed in ${scope ?? 'this project'} (/gates to review):\n\n${preview(formatted.text)}`)
         } else {

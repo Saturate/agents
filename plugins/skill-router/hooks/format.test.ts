@@ -113,3 +113,8 @@ test('zsh options that change words are not trusted', () => {
   }
   expect(shellWords('gh pr comment 1 --body=x', true)).toEqual(['gh', 'pr', 'comment', '1', '--body=x'])
 })
+
+test('an az value read from a file shows the command as written', () => {
+  const command = 'az repos pr update --id 12 --description @notes.md'
+  expect(formatCommand(command).text).toBe(command)
+})
