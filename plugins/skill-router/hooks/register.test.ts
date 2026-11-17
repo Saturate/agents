@@ -4,6 +4,7 @@ import { normalizeRemote } from './register'
 
 const CONF = [
   'gate\t^[[:space:]]*gh[[:space:]]+pr[[:space:]]+comment\tdraft-first\tThis posts a public comment.',
+  'gate\t^[[:space:]]*gh[[:space:]]+pr[[:space:]]+review\tdraft-first\tThis posts a review.',
   'block\t^[[:space:]]*git[[:space:]]+commit\tcommit',
   'block-tool\t^mcp__.+__repo_pull_request_write$\tmake-pr',
   'gate-tool\t^mcp__.+__repo_pull_request_thread_write$\tdraft-first\tThis posts a comment on a pull request.',
@@ -28,6 +29,9 @@ type Setup = {
   env?: string
   files?: Record<string, string>
   failing?: 'store' | 'repo' | 'cwd'
+  sessionId?: string
+  // Shell paths that aren't executable.
+  missing?: string[]
 }
 
 function engine(on: Parameters<Parameters<typeof test>[1]>[1], setup: Setup) {
@@ -39,7 +43,11 @@ function engine(on: Parameters<Parameters<typeof test>[1]>[1], setup: Setup) {
   })
   on('process.run', (_, e) => {
     if (setup.failing === 'repo') throw new Error('git failed')
-    if (e.argv[0] === 'env') return { value: { exitCode: 0, stdout: setup.env ?? 'PATH=/bin\n', stderr: '' } }
+    if (e.argv[0] === 'env') {
+      const env = setup.env ?? 'PATH=/bin\n'
+      return { value: { exitCode: 0, stdout: e.argv[1] === '-0' ? env.split('\n').join('\0') : env, stderr: '' } }
+    }
+    if (e.argv[0] === 'test') return { value: { exitCode: setup.missing?.includes(e.argv[2] ?? '') === true ? 1 : 0, stdout: '', stderr: '' } }
     const remote = setup.remote === undefined ? 'git@example:me/repo.git' : setup.remote
     const stdout = setup.gitConfig ?? (remote === null ? '' : `remote.origin.url ${remote}\nremote.origin.fetch +refs/heads/*:refs/remotes/origin/*\n`)
     return { value: { exitCode: stdout === '' ? 1 : 0, stdout, stderr: '' } }
@@ -48,6 +56,7 @@ function engine(on: Parameters<Parameters<typeof test>[1]>[1], setup: Setup) {
     if (setup.failing === 'cwd') throw new Error('cwd lookup failed')
     return { value: '/repo' }
   })
+  on('session.id', () => ({ value: setup.sessionId ?? 's1' }))
   on('command.list', () => ({ value: [{ name: 'commit', description: '', source: 'user' }] }))
   if (setup.failing === 'store') {
     on('store.get', () => {
@@ -114,7 +123,7 @@ test('a gated command runs only when the person approves it', async ($, on) => {
   await $.tool.call({ tool: 'Bash', command: 'gh pr comment 1 --body "hi"' })
 
   expect(refused).toContain('did not approve')
-  expect(setup.logged?.join('\n')).toContain('gh pr comment 1 --body "hi"')
+  expect(setup.logged?.join('\n')).toContain('gh pr comment\n  PR  1\n  Body\n  │ hi')
   expect(setup.ran).toEqual(['gh pr comment 1 --body "hi"'])
 })
 
@@ -378,7 +387,7 @@ test('a call run through always allow is still logged', async ($, on) => {
   await $.tool.call({ tool: 'Bash', command: 'gh pr comment 1 --body "a"' })
   await $.tool.call({ tool: 'Bash', command: 'gh pr comment 2 --body "b"' })
 
-  expect(setup.logged?.[1]).toContain('gh pr comment 2')
+  expect(setup.logged?.[1]).toContain('│ b')
 })
 
 test('a command substitution in the body still gets always allow', async ($, on) => {
@@ -437,4 +446,92 @@ test('the full command is shown in the transcript before the dialog', async ($, 
 
   expect(setup.logged?.join('\n')).toContain('the full body text')
   expect(setup.asked[0]).toContain('shown above')
+})
+
+test('allow for this session skips the dialog until reset, and is never stored', async ($, on) => {
+  const setup: Setup = { answer: 'Allow for this session', ran: [], asked: [], offered: [] }
+  engine(on, setup)
+
+  await $.tool.call({ tool: 'Bash', command: 'gh pr comment 1 --body "a"' })
+  await $.tool.call({ tool: 'Bash', command: 'gh pr comment 2 --body "b"' })
+  const listed = JSON.stringify(await $.command.run({ command: 'gates', args: '' }))
+  await $.command.run({ command: 'gates', args: 'reset' })
+  setup.answer = "Don't run"
+  await $.tool.call({ tool: 'Bash', command: 'gh pr comment 3 --body "c"' })
+
+  expect(setup.offered?.[0]).toContain('Allow for this session')
+  expect(setup.asked.length).toBe(2)
+  expect(setup.ran).toEqual(['gh pr comment 1 --body "a"', 'gh pr comment 2 --body "b"'])
+  expect(listed).toContain('allowed for this session')
+  expect(listed).not.toContain('always allowed (')
+})
+
+test('a session allow is not offered where always allow is not', async ($, on) => {
+  const setup: Setup = { answer: "Don't run", ran: [], asked: [], offered: [] }
+  engine(on, setup)
+
+  await $.tool.call({ tool: 'Bash', command: 'git reset --hard' })
+  await $.tool.call({ tool: 'Bash', command: 'gh pr comment 2 -R someone/else --body "b"' })
+
+  expect(setup.offered?.every(o => !o.includes('session'))).toBe(true)
+})
+
+test('the dialog names the call by its fields, not the raw command', async ($, on) => {
+  const setup: Setup = { answer: "Don't run", ran: [], asked: [], logged: [] }
+  engine(on, setup)
+
+  await $.tool.call({ tool: 'Bash', command: "gh pr review 7 --approve --body \"$(cat <<'EOF'\nLooks good.\n\nShip it.\nEOF\n)\"" })
+  await $.tool.call({ tool: 'mcp__ado__repo_pull_request_thread_write', project: 'P', repositoryId: 'web', content: 'line one\nline two' })
+
+  expect(setup.logged?.[0]).toContain('gh pr review\n  PR      7\n  Review  Approve\n  Body\n  │ Looks good.\n  │ \n  │ Ship it.')
+  expect(setup.asked[0]).toContain('`gh pr review 7`')
+  expect(setup.logged?.[1]).toContain('ado repo_pull_request_thread_write\n  project       P\n  repositoryId  web\n  content\n  │ line one\n  │ line two')
+})
+
+test('a body file is read from the exact path gh gets', async ($, on) => {
+  const setup: Setup = { answer: "Don't run", ran: [], asked: [], logged: [], files: { '/repo/ab.md': 'REAL', '/repo/a': 'DECOY' } }
+  engine(on, setup)
+
+  await $.tool.call({ tool: 'Bash', command: 'gh pr comment 1 --body-file "a"b.md' })
+
+  expect(setup.logged?.[0]).toContain('REAL')
+  expect(setup.logged?.[0]).not.toContain('DECOY')
+})
+
+test('a session allow does not reach another session', async ($, on) => {
+  const setup: Setup = { answer: 'Allow for this session', ran: [], asked: [] }
+  engine(on, setup)
+
+  await $.tool.call({ tool: 'Bash', command: 'gh pr comment 1 --body "a"' })
+  setup.sessionId = 's2'
+  setup.answer = "Don't run"
+  await $.tool.call({ tool: 'Bash', command: 'gh pr comment 2 --body "b"' })
+  setup.sessionId = 's1'
+  await $.command.run({ command: 'gates', args: 'reset' })
+
+  expect(setup.asked.length).toBe(2)
+})
+
+test('the shell the Bash tool uses decides how a heredoc body is read', async ($, on) => {
+  const setup: Setup = { answer: "Don't run", ran: [], asked: [], logged: [], env: 'SHELL=/bin/zsh\n' }
+  engine(on, setup)
+  const command = "gh pr comment 1 --body \"$(cat <<'EOF'\nIt's done\nEOF\n)\""
+
+  await $.tool.call({ tool: 'Bash', command })
+  setup.env = 'SHELL=/bin/zsh\nCLAUDE_CODE_SHELL=/bin/bash\n'
+  await $.tool.call({ tool: 'Bash', command })
+  setup.env = 'SHELL=/bin/bash\nCLAUDE_CODE_SHELL=/opt/missing/zsh\n'
+  setup.missing = ['/opt/missing/zsh']
+  await $.tool.call({ tool: 'Bash', command })
+  setup.env = 'X=a\nCLAUDE_CODE_SHELL=/bin/zsh\nSHELL=/bin/bash\n'
+  setup.missing = []
+  await $.tool.call({ tool: 'Bash', command })
+
+  expect(setup.logged?.[0]).toContain("│ It's done")
+  expect(setup.logged?.[1]).toContain(command)
+  expect(setup.logged?.[2]).toContain(command)
+  expect(setup.logged?.[3]).toContain("│ It's done")
+  setup.env = 'CLAUDE_CODE_SHELL=bash\nSHELL=/bin/zsh\n'
+  await $.tool.call({ tool: 'Bash', command })
+  expect(setup.logged?.[4]).toContain(command)
 })
