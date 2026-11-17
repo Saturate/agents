@@ -1,11 +1,14 @@
 import type { EngineInterface, Register } from 'claude-code'
 
+import { block, formatCommand, formatTool } from './format'
+import type { Shown } from './format'
 import { commandSegments, judge, outerSegments, parseRules, ruleId, skillName } from './rules'
 import type { Rule } from './rules'
 
 const MAIN = 'main'
 const PREVIEW_LIMIT = 1500
 const RUN = 'Run it'
+const SESSION = 'Allow for this session'
 const ALWAYS = 'Always allow in this project'
 const DONT_RUN = "Don't run"
 
@@ -60,6 +63,9 @@ function listSkills(skills: readonly string[]): string {
 }
 
 const STORE_KEY = 'allowed-gates'
+
+// Allows that last until the session ends, by scope; never written down.
+const sessionAllowed = new Map<string, Set<string>>()
 
 // Force pushes and hard resets are judged per command, never per project.
 // A fork names its target as a plain argument anywhere among its flags, and
@@ -186,11 +192,18 @@ async function readAllowed($: EngineInterface): Promise<Map<string, Set<string>>
 // whole hook failing open and every rule going quiet.
 async function allowedIn($: EngineInterface, scope: string | undefined): Promise<Set<string>> {
   if (scope === undefined) return new Set()
+  const forSession = sessionAllowed.get(scope) ?? new Set()
   try {
-    return (await readAllowed($)).get(scope) ?? new Set()
+    return new Set([...forSession, ...((await readAllowed($)).get(scope) ?? [])])
   } catch {
-    return new Set()
+    return forSession
   }
+}
+
+function allowForSession(scope: string, gates: readonly Rule[]): void {
+  const ids = sessionAllowed.get(scope) ?? new Set()
+  for (const gate of gates) ids.add(ruleId(gate))
+  sessionAllowed.set(scope, ids)
 }
 
 async function allowGates($: EngineInterface, scope: string, gates: readonly Rule[]): Promise<void> {
@@ -215,46 +228,50 @@ async function bodyFiles($: EngineInterface, command: string, gates: readonly Ru
     if (!path || path === '-') continue
     // A device such as /dev/stdin could block the read.
     if (path.startsWith('/dev/')) {
-      parts.push(`--- ${path} (not read) ---`)
+      parts.push(`  Body file ${path} (not read)`)
       continue
     }
     if (/^[~$]/.test(path) || (moved && !path.startsWith('/'))) {
-      parts.push(`--- ${path} (not read: its location depends on the shell) ---`)
+      parts.push(`  Body file ${path} (not read: its location depends on the shell)`)
       continue
     }
     try {
       const full = path.startsWith('/') ? path : `${await $.session.cwd()}/${path}`
       const text = await $.fs.read(full)
-      parts.push(typeof text === 'string' ? `--- ${path} ---\n${text}` : `--- ${path} (could not be read) ---`)
+      parts.push(typeof text === 'string' ? block(`Body file ${path}`, text) : `  Body file ${path} (could not be read)`)
     } catch {
-      parts.push(`--- ${path} (could not be read) ---`)
+      parts.push(`  Body file ${path} (could not be read)`)
     }
   }
-  return parts.join('\n\n')
+  return parts.join('\n')
 }
 
 // The engine refuses AskUserQuestion through $.tool.call and $.ui.ask has no
 // preview box, so the full command goes into the transcript as its own row
 // just above the dialog, where it is drawn whole instead of squashed into
 // the question line.
-async function approve($: EngineInterface, gates: readonly Rule[], shown: string, scope: string | undefined): Promise<string | undefined> {
+async function approve($: EngineInterface, gates: readonly Rule[], shown: Shown, scope: string | undefined): Promise<string | undefined> {
   const messages = gates.map(g => g.message).join(' ')
   const canAlways = scope !== undefined && !gates.some(neverAlways)
-  $.ui.log(`skill-router asks before running this:\n\n${preview(shown)}`)
+  $.ui.log(`skill-router asks before running this:\n\n${preview(shown.text)}`)
   let answer: string | undefined
   try {
-    // The first line goes in the question too: a phone card over Remote
+    // The call is named in the question too: a phone card over Remote
     // Control may show only the dialog, not the log row above it.
-    const head = (shown.split('\n')[0] ?? '').slice(0, 200).replaceAll('`', "'")
+    const head = shown.head.slice(0, 200).replaceAll('`', "'")
     answer = await $.ui.ask(`${messages} Run \`${head}\` (full text shown above)?`, {
       header: 'Approve',
-      options: canAlways ? [RUN, ALWAYS, DONT_RUN] : [RUN, DONT_RUN],
+      options: canAlways ? [RUN, SESSION, ALWAYS, DONT_RUN] : [RUN, DONT_RUN],
     })
   } catch {
     answer = undefined
   }
   if (answer === undefined) return `${messages} The approval dialog was dismissed, or nobody was here to answer it, so it was not run.`
   if (answer === RUN) return undefined
+  if (answer === SESSION && canAlways) {
+    allowForSession(scope, gates)
+    return undefined
+  }
   if (answer === ALWAYS && canAlways) {
     try {
       await allowGates($, scope, gates)
@@ -280,6 +297,7 @@ export const register: Register = on => {
     let all: Rule[]
     try {
       if (e.args.trim() === 'reset') {
+        sessionAllowed.clear()
         await $.store.delete(STORE_KEY)
         return { text: 'every gate asks again, in every project.' }
       }
@@ -288,15 +306,22 @@ export const register: Register = on => {
     } catch {
       return { text: 'could not read or reset the allow list.' }
     }
-    const lines: string[] = []
-    for (const [scope, ids] of allowed) {
-      const names = all.filter(r => ids.has(ruleId(r))).map(r => `  - ${r.message}`)
-      if (names.length > 0) lines.push(scope, ...names)
+    const list = (from: Map<string, Set<string>>): string[] => {
+      const lines: string[] = []
+      for (const [scope, ids] of from) {
+        const names = all.filter(r => ids.has(ruleId(r))).map(r => `  - ${r.message}`)
+        if (names.length > 0) lines.push(scope, ...names)
+      }
+      return lines
     }
+    const always = list(allowed)
+    const session = list(sessionAllowed)
+    if (always.length === 0 && session.length === 0) return { text: 'no gates are always allowed.' }
     return {
-      text: lines.length === 0
-        ? 'no gates are always allowed.'
-        : ['always allowed (/gates reset to undo):', ...lines].join('\n'),
+      text: [
+        ...(always.length > 0 ? ['always allowed (/gates reset to undo):', ...always] : []),
+        ...(session.length > 0 ? ['allowed for this session:', ...session] : []),
+      ].join('\n'),
     }
   })
 
@@ -330,6 +355,7 @@ export const register: Register = on => {
   })
   on('session.end', ($, e, next) => {
     loaded.clear()
+    sessionAllowed.clear()
     return next(e)
   })
 
@@ -355,11 +381,12 @@ export const register: Register = on => {
         const scope = await scopeOf($, e, command, verdict.gates).catch(() => undefined)
         const allowed = await allowedIn($, scope)
         const asking = verdict.gates.filter(g => neverAlways(g) || !allowed.has(ruleId(g)))
+        const formatted = command !== undefined ? formatCommand(command) : formatTool(e)
         if (asking.length === 0) {
-          $.ui.log(`skill-router: always allowed in ${scope ?? 'this project'} (/gates to review):\n\n${preview(command ?? JSON.stringify(e, null, 2))}`)
+          $.ui.log(`skill-router: allowed in ${scope ?? 'this project'} (/gates to review):\n\n${preview(formatted.text)}`)
         } else {
-          const shown = command !== undefined ? [command, await bodyFiles($, command, verdict.gates)].filter(t => t.length > 0).join('\n\n') : JSON.stringify(e, null, 2)
-          refusal = await approve($, asking, shown, scope)
+          const files = command !== undefined ? await bodyFiles($, command, verdict.gates) : ''
+          refusal = await approve($, asking, { ...formatted, text: [formatted.text, files].filter(t => t.length > 0).join('\n') }, scope)
         }
       } catch (error) {
         refusal = `skill-router could not finish asking about this, so it was not run (${error instanceof Error ? error.message : String(error)}).`

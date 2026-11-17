@@ -4,6 +4,7 @@ import { normalizeRemote } from './register'
 
 const CONF = [
   'gate\t^[[:space:]]*gh[[:space:]]+pr[[:space:]]+comment\tdraft-first\tThis posts a public comment.',
+  'gate\t^[[:space:]]*gh[[:space:]]+pr[[:space:]]+review\tdraft-first\tThis posts a review.',
   'block\t^[[:space:]]*git[[:space:]]+commit\tcommit',
   'block-tool\t^mcp__.+__repo_pull_request_write$\tmake-pr',
   'gate-tool\t^mcp__.+__repo_pull_request_thread_write$\tdraft-first\tThis posts a comment on a pull request.',
@@ -114,7 +115,7 @@ test('a gated command runs only when the person approves it', async ($, on) => {
   await $.tool.call({ tool: 'Bash', command: 'gh pr comment 1 --body "hi"' })
 
   expect(refused).toContain('did not approve')
-  expect(setup.logged?.join('\n')).toContain('gh pr comment 1 --body "hi"')
+  expect(setup.logged?.join('\n')).toContain('gh pr comment\n  PR  1\n  Body\n  │ hi')
   expect(setup.ran).toEqual(['gh pr comment 1 --body "hi"'])
 })
 
@@ -378,7 +379,7 @@ test('a call run through always allow is still logged', async ($, on) => {
   await $.tool.call({ tool: 'Bash', command: 'gh pr comment 1 --body "a"' })
   await $.tool.call({ tool: 'Bash', command: 'gh pr comment 2 --body "b"' })
 
-  expect(setup.logged?.[1]).toContain('gh pr comment 2')
+  expect(setup.logged?.[1]).toContain('│ b')
 })
 
 test('a command substitution in the body still gets always allow', async ($, on) => {
@@ -437,4 +438,44 @@ test('the full command is shown in the transcript before the dialog', async ($, 
 
   expect(setup.logged?.join('\n')).toContain('the full body text')
   expect(setup.asked[0]).toContain('shown above')
+})
+
+test('allow for this session skips the dialog until reset, and is never stored', async ($, on) => {
+  const setup: Setup = { answer: 'Allow for this session', ran: [], asked: [], offered: [] }
+  engine(on, setup)
+
+  await $.tool.call({ tool: 'Bash', command: 'gh pr comment 1 --body "a"' })
+  await $.tool.call({ tool: 'Bash', command: 'gh pr comment 2 --body "b"' })
+  const listed = JSON.stringify(await $.command.run({ command: 'gates', args: '' }))
+  await $.command.run({ command: 'gates', args: 'reset' })
+  setup.answer = "Don't run"
+  await $.tool.call({ tool: 'Bash', command: 'gh pr comment 3 --body "c"' })
+
+  expect(setup.offered?.[0]).toContain('Allow for this session')
+  expect(setup.asked.length).toBe(2)
+  expect(setup.ran).toEqual(['gh pr comment 1 --body "a"', 'gh pr comment 2 --body "b"'])
+  expect(listed).toContain('allowed for this session')
+  expect(listed).not.toContain('always allowed (')
+})
+
+test('a session allow is not offered where always allow is not', async ($, on) => {
+  const setup: Setup = { answer: "Don't run", ran: [], asked: [], offered: [] }
+  engine(on, setup)
+
+  await $.tool.call({ tool: 'Bash', command: 'git reset --hard' })
+  await $.tool.call({ tool: 'Bash', command: 'gh pr comment 2 -R someone/else --body "b"' })
+
+  expect(setup.offered?.every(o => !o.includes('session'))).toBe(true)
+})
+
+test('the dialog names the call by its fields, not the raw command', async ($, on) => {
+  const setup: Setup = { answer: "Don't run", ran: [], asked: [], logged: [] }
+  engine(on, setup)
+
+  await $.tool.call({ tool: 'Bash', command: "gh pr review 7 --approve --body \"$(cat <<'EOF'\nLooks good.\n\nShip it.\nEOF\n)\"" })
+  await $.tool.call({ tool: 'mcp__ado__repo_pull_request_thread_write', project: 'P', repositoryId: 'web', content: 'line one\nline two' })
+
+  expect(setup.logged?.[0]).toContain('gh pr review\n  PR      7\n  Review  Approve\n  Body\n  │ Looks good.\n  │ \n  │ Ship it.')
+  expect(setup.asked[0]).toContain('`gh pr review 7`')
+  expect(setup.logged?.[1]).toContain('ado repo_pull_request_thread_write\n  project       P\n  repositoryId  web\n  content\n  │ line one\n  │ line two')
 })
