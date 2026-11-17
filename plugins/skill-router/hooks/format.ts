@@ -28,7 +28,7 @@ function balanced(text: string): boolean {
 // The body ends at the first line that is exactly the delimiter, as in the
 // shell; anything after that line other than the closing `)` would run as
 // commands, so it is not read.
-function heredocSub(src: string, start: number): { text: string; length: number } | undefined {
+function heredocSub(src: string, start: number, zsh: boolean): { text: string; length: number } | undefined {
   const open = HEREDOC_OPEN.exec(src.slice(start))
   if (!open) return undefined
   const [opener, dash = '', quote = '', delimiter = ''] = open
@@ -54,6 +54,10 @@ function heredocSub(src: string, start: number): { text: string; length: number 
   // bash 3.2 (macOS /bin/bash) closes the `$(` at the first unmatched `)` in
   // the body and runs what follows, so only balanced parentheses are read.
   if (!balanced(body)) return undefined
+  // bash 3.2 also reads quotes, backslashes and `#` comments in the body when
+  // it looks for that `)`, so under bash such a body is not read either. zsh
+  // reads the heredoc as a heredoc.
+  if (!zsh && /['"`\\#]/.test(body)) return undefined
   // A substitution drops every trailing newline of its output.
   return { text: body.replace(/\n+$/, ''), length: at + close[0].length - start }
 }
@@ -66,7 +70,7 @@ const LITERAL = /[A-Za-z0-9._/@+#=:,%-]/
 // The words a simple command passes, as the shell would pass them, or
 // undefined when any of them depends on the shell at run time (a variable, a
 // glob, a second command, a substitution other than a quoted heredoc).
-export function shellWords(command: string): string[] | undefined {
+export function shellWords(command: string, zsh = false): string[] | undefined {
   const src = command.trim()
   const words: string[] = []
   let word: string | undefined
@@ -88,7 +92,7 @@ export function shellWords(command: string): string[] | undefined {
       word = (word ?? '') + src.slice(i + 1, end)
       i = end + 1
     } else if (c === '"') {
-      const quoted = doubleQuoted(src, i + 1)
+      const quoted = doubleQuoted(src, i + 1, zsh)
       if (quoted === undefined) return undefined
       word = (word ?? '') + quoted.text
       i = quoted.end + 1
@@ -103,7 +107,7 @@ export function shellWords(command: string): string[] | undefined {
   return words
 }
 
-function doubleQuoted(src: string, start: number): { text: string; end: number } | undefined {
+function doubleQuoted(src: string, start: number, zsh: boolean): { text: string; end: number } | undefined {
   let text = ''
   let j = start
   while (j < src.length) {
@@ -122,7 +126,7 @@ function doubleQuoted(src: string, start: number): { text: string; end: number }
         j++
       }
     } else if (d === '$') {
-      const sub = heredocSub(src, j)
+      const sub = heredocSub(src, j, zsh)
       if (!sub) return undefined
       text += sub.text
       j += sub.length
@@ -233,8 +237,10 @@ function formatGh(words: readonly string[]): Shown | undefined {
   return { text: [`gh ${name}`, ...fields(rows), ...blocks].join('\n'), head: oneLine(head), bodyFiles }
 }
 
-export function formatCommand(command: string): Shown {
-  const words = shellWords(command)
+// `zsh`: the command runs under zsh, which reads a heredoc body as written;
+// anything else is read the way macOS's bash 3.2 would.
+export function formatCommand(command: string, zsh = false): Shown {
+  const words = shellWords(command, zsh)
   const formatted = words === undefined ? undefined : formatGh(words)
   return formatted ?? { text: command, head: oneLine(command.split('\n')[0] ?? '') }
 }

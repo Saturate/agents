@@ -128,6 +128,19 @@ function plainCall(command: string, gates: readonly Rule[]): boolean {
   })
 }
 
+// The Bash tool runs commands in CLAUDE_CODE_SHELL, else the user's SHELL.
+async function runsUnderZsh($: EngineInterface): Promise<boolean> {
+  try {
+    const { exitCode, stdout } = await $.process.run(['env'])
+    if (exitCode !== 0) return false
+    const value = (name: string) => new RegExp(`^${name}=(.*)$`, 'm').exec(stdout)?.[1]
+    const shell = value('CLAUDE_CODE_SHELL') ?? value('SHELL') ?? ''
+    return shell.split('/').pop() === 'zsh'
+  } catch {
+    return false
+  }
+}
+
 // Variables in Claude Code's own environment that steer gh or git elsewhere.
 const STEERING_ENV = /^(?:GH_REPO|GH_HOST|GIT_DIR|GIT_WORK_TREE|GIT_CONFIG\w*)=/m
 
@@ -395,7 +408,7 @@ export const register: Register = on => {
         const session = await sessionKey($, scope)
         const allowed = await allowedIn($, scope, session)
         const asking = verdict.gates.filter(g => neverAlways(g) || !allowed.has(ruleId(g)))
-        const formatted = command !== undefined ? formatCommand(command) : formatTool(e)
+        const formatted = command !== undefined ? formatCommand(command, await runsUnderZsh($)) : formatTool(e)
         if (asking.length === 0) {
           $.ui.log(`skill-router: allowed in ${scope ?? 'this project'} (/gates to review):\n\n${preview(formatted.text)}`)
         } else {

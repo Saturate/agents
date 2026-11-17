@@ -505,3 +505,16 @@ test('a session allow does not reach another session', async ($, on) => {
 
   expect(setup.asked.length).toBe(2)
 })
+
+test('the shell the Bash tool uses decides how a heredoc body is read', async ($, on) => {
+  const setup: Setup = { answer: "Don't run", ran: [], asked: [], logged: [], env: 'SHELL=/bin/zsh\n' }
+  engine(on, setup)
+  const command = "gh pr comment 1 --body \"$(cat <<'EOF'\nIt's done\nEOF\n)\""
+
+  await $.tool.call({ tool: 'Bash', command })
+  setup.env = 'SHELL=/bin/zsh\nCLAUDE_CODE_SHELL=/bin/bash\n'
+  await $.tool.call({ tool: 'Bash', command })
+
+  expect(setup.logged?.[0]).toContain("│ It's done")
+  expect(setup.logged?.[1]).toContain(command)
+})

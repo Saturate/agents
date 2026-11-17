@@ -93,3 +93,16 @@ test('a zsh =word is not read', () => {
 test('tag characters and soft hyphens are escaped', () => {
   expect(formatCommand('gh pr comment 1 --body "ok\u{e0049}\u00ad"').text).toContain('ok\\u{e0049}\\u{ad}')
 })
+
+test('under bash, a body with quotes, backslashes or # is not read', () => {
+  const heredoc = (body: string) => `"$(cat <<'EOF'\n${body}\nEOF\n)"`
+  const cases = [
+    `gh pr comment 1 --body ${heredoc('## Notes (draft\n) see $(touch PWN)')}`,
+    `gh pr comment 1 --body ${heredoc('a \\( b ) see $(touch PWN)')}`,
+    `gh issue create --title ${heredoc("Fix (it's) parsing")} --body ${heredoc('Repro ((see log: it\'s ))"; touch PWN; : "')}`,
+    `gh issue create --title ${heredoc('Fix (\`code) parsing')} --body x`,
+    `gh pr comment 1 --body ${heredoc("It's blocked")}`,
+  ]
+  for (const command of cases) expect(formatCommand(command).text).toBe(command)
+  expect(formatCommand(`gh pr comment 1 --body ${heredoc("It's done, see #12")}`, true).text).toContain("│ It's done, see #12")
+})
