@@ -47,17 +47,18 @@ export function parseRules(text: string): Rule[] {
 
 const PREFIXES = [
   /^[({!]\s*/,
-  /^(?:then|do|else|elif|if|while|until)\s+/,
+  /^(?:then|do|else|elif|if|while|until)\s+/i,
   // `\git` skips an alias and `/usr/bin/git` names the binary; both are git.
   /^\\(?=[A-Za-z])/,
   /^\/?(?:[\w.-]+\/)+(?=[\w.-]+(?:\s|$))/,
   // Environment assignments: FOO=bar git commit
   /^[A-Za-z_][A-Za-z0-9_]*=(?:'[^']*'|"[^"]*"|\S*)\s+/,
-  /^(?:sudo|command|exec|time|nohup|env)\s+/,
+  // A case-insensitive filesystem (macOS) runs `ENV` and `NOHUP` too.
+  /^(?:sudo|command|exec|time|nohup|env)\s+/i,
 ]
 
 // `git -C ../repo commit` is still a commit.
-const GIT_GLOBAL_OPTIONS = /^git(?:\s+(?:-C\s+\S+|-c\s+\S+|--no-pager|--git-dir=\S+|--work-tree=\S+))+(?=\s)/
+const GIT_GLOBAL_OPTIONS = /^git(?:\s+(?:-C\s+\S+|-c\s+\S+|--no-pager|--git-dir=\S+|--work-tree=\S+))+(?=\s)/i
 
 function stripPrefixes(segment: string): string {
   let out = segment.trim()
@@ -164,9 +165,26 @@ function split(command: string): { parts: string[]; inner: string[] } {
   return { parts: outer.split(/\|\||&&|[;|&\n]|[()]/), inner }
 }
 
+// The rules are written in lower case. A case-insensitive filesystem (macOS)
+// runs `GIT` as git, and Azure CLI lowercases its command words (`az REPOS PR
+// UPDATE`), so those are matched in lower case too.
+function canonical(segment: string): string {
+  const words = segment.split(/(\s+)/)
+  const az = (words[0] ?? '').toLowerCase() === 'az'
+  let commandWords = true
+  return words
+    .map((word, i) => {
+      if (i === 0) return word.toLowerCase()
+      if (!az || !commandWords || /^\s+$/.test(word)) return word
+      if (word.startsWith('-')) commandWords = false
+      return commandWords ? word.toLowerCase() : word
+    })
+    .join('')
+}
+
 export function commandSegments(command: string, depth = 0): string[] {
   const { parts, inner } = split(command)
-  const segments = parts.map(stripPrefixes).filter(segment => segment.length > 0)
+  const segments = parts.map(stripPrefixes).map(canonical).filter(segment => segment.length > 0)
   if (depth >= MAX_DEPTH) return segments
   return [...segments, ...inner.flatMap(body => commandSegments(body, depth + 1))]
 }

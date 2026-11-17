@@ -113,3 +113,27 @@ test('zsh options that change words are not trusted', () => {
   }
   expect(shellWords('gh pr comment 1 --body=x', true)).toEqual(['gh', 'pr', 'comment', '1', '--body=x'])
 })
+
+test('an az value read from a file shows the command as written', () => {
+  const command = 'az repos pr update --id 12 --description @notes.md'
+  expect(formatCommand(command).text).toBe(command)
+})
+
+test('az true/false flags never take the next flag as their value', () => {
+  expect(formatCommand('az repos pr update --id 12 --draft --org=https://dev.azure.com/other --status abandoned').text).toContain('  Org ')
+  const squash = formatCommand('az repos pr update --id 12 --squash --bypass-policy --status completed')
+  expect(squash.text).toContain('Bypass policy  true')
+  expect(squash.head).toBe('az repos pr update 12 completed')
+  expect(formatCommand('az repos pr update --id 12 --title -x').text).toBe('az repos pr update --id 12 --title -x')
+})
+
+test('an az word read from a file shows the command as written', () => {
+  for (const command of ['az repos pr update --id 12 --description "see k=@~/.ssh/id_rsa"', 'az repos pr update @a 4242', 'az devops invoke --route-parameters path=@secret']) {
+    expect(formatCommand(command).text).toBe(command)
+  }
+})
+
+test('the az head names the action', () => {
+  expect(formatCommand('az repos pr set-vote --id 12 --vote reject').head).toBe('az repos pr set-vote 12 reject')
+  expect(formatCommand('az devops invoke --area git --resource pullRequestThreads --http-method POST').head).toBe('az devops invoke POST pullRequestThreads')
+})

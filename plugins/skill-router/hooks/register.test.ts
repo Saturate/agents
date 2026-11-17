@@ -9,7 +9,9 @@ const CONF = [
   'block-tool\t^mcp__.+__repo_pull_request_write$\tmake-pr',
   'gate-tool\t^mcp__.+__repo_pull_request_thread_write$\tdraft-first\tThis posts a comment on a pull request.',
   'gate\t^[[:space:]]*git[[:space:]]+reset[[:space:]]+--hard\tconfirm-destructive\tThis discards changes.',
-  'gate\t^[[:space:]]*gh[[:space:]]+repo[[:space:]]+fork\tconfirm-external\tThis forks a repository.',
+  'gate\t^[[:space:]]*gh[[:space:]]+repo[[:space:]]+fork\tconfirm-each\tThis forks a repository.',
+  'gate\t^[[:space:]]*az[[:space:]]+repos[[:space:]]+pr[[:space:]]+(set-vote|update)\tconfirm-external\tThis changes an Azure DevOps PR.',
+  'gate\t^[[:space:]]*az[[:space:]]+devops[[:space:]]+invoke\tconfirm-each\tThis calls the Azure DevOps REST API.',
 ].join('\n')
 
 // $.ui.ask is a tool.call of AskUserQuestion, answered here as the engine would.
@@ -32,6 +34,9 @@ type Setup = {
   sessionId?: string
   // Shell paths that aren't executable.
   missing?: string[]
+  // The repo `az repos pr show` reports for a PR id.
+  azPrRepos?: Record<string, string>
+  azShown?: string[]
 }
 
 function engine(on: Parameters<Parameters<typeof test>[1]>[1], setup: Setup) {
@@ -48,6 +53,12 @@ function engine(on: Parameters<Parameters<typeof test>[1]>[1], setup: Setup) {
       return { value: { exitCode: 0, stdout: e.argv[1] === '-0' ? env.split('\n').join('\0') : env, stderr: '' } }
     }
     if (e.argv[0] === 'test') return { value: { exitCode: setup.missing?.includes(e.argv[2] ?? '') === true ? 1 : 0, stdout: '', stderr: '' } }
+    if (e.argv[0] === 'az') {
+      const id = e.argv[e.argv.indexOf('--id') + 1] ?? ''
+      setup.azShown?.push(id)
+      const url = setup.azPrRepos?.[id]
+      return { value: { exitCode: url === undefined ? 1 : 0, stdout: url === undefined ? '' : JSON.stringify(url.endsWith('#bypass') ? [url.slice(0, -7), true] : [url, null]), stderr: '' } }
+    }
     const remote = setup.remote === undefined ? 'git@example:me/repo.git' : setup.remote
     const stdout = setup.gitConfig ?? (remote === null ? '' : `remote.origin.url ${remote}\nremote.origin.fetch +refs/heads/*:refs/remotes/origin/*\n`)
     return { value: { exitCode: stdout === '' ? 1 : 0, stdout, stderr: '' } }
@@ -534,4 +545,63 @@ test('the shell the Bash tool uses decides how a heredoc body is read', async ($
   setup.env = 'CLAUDE_CODE_SHELL=bash\nSHELL=/bin/zsh\n'
   await $.tool.call({ tool: 'Bash', command })
   expect(setup.logged?.[4]).toContain(command)
+})
+
+const ADO_REMOTE = 'git@ssh.dev.azure.com:v3/org/proj/web'
+
+test('an az PR vote gets always allow only when az places the PR in this repo', async ($, on) => {
+  const setup: Setup = {
+    answer: 'Always allow in this project',
+    ran: [],
+    asked: [],
+    offered: [],
+    azShown: [],
+    remote: ADO_REMOTE,
+    azPrRepos: { '12': 'https://dev.azure.com/org/proj/_git/web', '13': 'https://dev.azure.com/org/proj/_git/web', '99': 'https://dev.azure.com/org/proj/_git/api', '77': 'https://dev.azure.com/org/proj/_git/web#bypass' },
+  }
+  engine(on, setup)
+
+  await $.tool.call({ tool: 'Bash', command: 'az repos pr set-vote --id 12 --vote approve' })
+  await $.tool.call({ tool: 'Bash', command: 'az repos pr set-vote --id 13 --vote approve' })
+  setup.answer = "Don't run"
+  await $.tool.call({ tool: 'Bash', command: 'az repos pr set-vote --id 99 --vote approve' })
+  await $.tool.call({ tool: 'Bash', command: 'az repos pr set-vote --id 13 --vote approve --org https://dev.azure.com/other' })
+  await $.tool.call({ tool: 'Bash', command: 'az repos pr update --id 13 --status completed --bypass-policy true' })
+  await $.tool.call({ tool: 'Bash', command: 'cd ../api && az repos pr set-vote --id 13 --vote approve' })
+  await $.tool.call({ tool: 'Bash', command: 'az repos pr set-vote --id 77 --vote approve' })
+  await $.command.run({ command: 'gates', args: 'reset' })
+
+  expect(setup.ran).toEqual(['az repos pr set-vote --id 12 --vote approve', 'az repos pr set-vote --id 13 --vote approve'])
+  expect(setup.asked.length).toBe(6)
+  expect(setup.offered?.slice(1).every(o => !o.includes('Always'))).toBe(true)
+  expect(setup.azShown).toEqual(['12', '13', '99', '77'])
+})
+
+test('az devops invoke always asks', async ($, on) => {
+  const setup: Setup = { answer: "Don't run", ran: [], asked: [], offered: [], remote: ADO_REMOTE }
+  engine(on, setup)
+
+  await $.tool.call({ tool: 'Bash', command: 'az devops invoke --area git --resource pullRequestThreads --http-method POST --in-file c.json' })
+
+  expect(setup.offered?.[0]).toBe('[{"label":"Run it","description":""},{"label":"Don\'t run","description":""}]')
+})
+
+test('an az PR update is laid out with its description as a block', async ($, on) => {
+  const setup: Setup = { answer: "Don't run", ran: [], asked: [], logged: [], remote: ADO_REMOTE }
+  engine(on, setup)
+
+  await $.tool.call({ tool: 'Bash', command: 'az repos pr update --id 12 --title "Fix login" --description "First line" "Second line" --auto-complete true' })
+
+  expect(setup.logged?.[0]).toContain('az repos pr update\n  PR             12\n  Title          Fix login\n  Auto-complete  true\n  Description\n  │ First line\n  │ Second line')
+  expect(setup.asked[0]).toContain('`az repos pr update 12 "Fix login"`')
+})
+
+test('an az command never gets always allow from its plain arguments alone', async ($, on) => {
+  const setup: Setup = { answer: "Don't run", ran: [], asked: [], offered: [], remote: ADO_REMOTE, azShown: [] }
+  engine(on, setup)
+
+  await $.tool.call({ tool: 'Bash', command: 'az repos pr update @a 4242 @b completed' })
+
+  expect(setup.offered?.[0]).not.toContain('Always')
+  expect(setup.azShown).toEqual([])
 })
