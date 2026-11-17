@@ -53,9 +53,11 @@ test('an MCP call drops the reserved keys', () => {
 test('the heredoc ends at the first exact delimiter line, as in the shell', () => {
   const smuggled = `gh pr comment 1 --body "$(cat <<'EOF'\nhello\nEOF\ntouch pwned\ncat <<'EOF'\nworld\nEOF\n)"`
   expect(formatCommand(smuggled).text).toBe(smuggled)
-  for (const fake of ['  EOF', 'EOF  ', 'EOF\r']) {
+  const indented = `gh pr comment 1 --body "$(cat <<'EOF'\nA\n  EOF\nB\nEOF\n)"`
+  expect(formatCommand(indented).text).toBe('gh pr comment\n  PR  1\n  Body\n  │ A\n  │   EOF\n  │ B')
+  for (const fake of ['EOF  ', 'EOF\r']) {
     const command = `gh pr comment 1 --body "$(cat <<'EOF'\nA\n${fake}\nB\nEOF\n)"`
-    expect(formatCommand(command).text).toBe('gh pr comment\n  PR  1\n  Body\n  │ A\n  │ ' + fake.replace('\r', '\\u{d}') + '\n  │ B')
+    expect(formatCommand(command).text).toBe(command)
   }
   expect(shellWords(`x --body "$(cat\n<<'EOF'\nbody\nEOF\n)"`)).toBe(undefined)
   expect(shellWords(`x --body "$(cat <<'EOF'\nbody\n\n\nEOF\n)"`)).toEqual(['x', '--body', 'body'])
@@ -73,4 +75,21 @@ test('an MCP key that is not a plain name shows the call as JSON', () => {
 
 test('bidi overrides and zero-width characters are escaped', () => {
   expect(formatCommand('gh pr comment 1 --body "safe \u202eevil\u200b"').text).toContain('safe \\u{202e}evil\\u{200b}')
+})
+
+test('a body bash would end early or close on is not read', () => {
+  for (const body of ['hello\nEOF)"; echo PWNED; echo "', 'EOF x)', 'thanks :)', '1) first\n2) second']) {
+    const command = `gh pr comment 1 --body "$(cat <<'EOF'\n${body}\nEOF\n)"`
+    expect(formatCommand(command).text).toBe(command)
+  }
+  expect(formatCommand(`gh pr comment 1 --body "$(cat <<'EOF'\nsee (a) and (b)\nEOF\n)"`).text).toContain('│ see (a) and (b)')
+})
+
+test('a zsh =word is not read', () => {
+  expect(shellWords('gh issue create --title =sh --body x')).toBe(undefined)
+  expect(shellWords('gh pr comment 1 --body a=b')).toEqual(['gh', 'pr', 'comment', '1', '--body', 'a=b'])
+})
+
+test('tag characters and soft hyphens are escaped', () => {
+  expect(formatCommand('gh pr comment 1 --body "ok\u{e0049}\u00ad"').text).toContain('ok\\u{e0049}\\u{ad}')
 })

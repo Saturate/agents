@@ -15,6 +15,15 @@ export type Shown = {
 // The opener of `"$(cat <<'EOF' ... EOF)"`, how Claude passes multi-line text.
 const HEREDOC_OPEN = /^\$\([ \t]*cat[ \t]+<<(-?)[ \t]*(['"]?)([A-Za-z_][A-Za-z0-9_]*)\2[ \t]*\n/
 
+function balanced(text: string): boolean {
+  let depth = 0
+  for (const c of text) {
+    if (c === '(') depth++
+    else if (c === ')' && --depth < 0) return false
+  }
+  return depth === 0
+}
+
 // The text a quoted heredoc substitution at `start` produces, and its length.
 // The body ends at the first line that is exactly the delimiter, as in the
 // shell; anything after that line other than the closing `)` would run as
@@ -32,6 +41,9 @@ function heredocSub(src: string, start: number): { text: string; length: number 
     const line = dash === '-' ? raw.replace(/^\t+/, '') : raw
     at = nl + 1
     if (line === delimiter) break
+    // bash ends the heredoc early on a line that starts with the delimiter
+    // and has a `)` later, and runs the rest of that line.
+    if (raw.startsWith(delimiter)) return undefined
     lines.push(line)
   }
   const close = /^[ \t\n]*\)/.exec(src.slice(at))
@@ -39,12 +51,16 @@ function heredocSub(src: string, start: number): { text: string; length: number 
   const body = lines.join('\n')
   // An unquoted delimiter expands `$x` and backticks in the body.
   if (quote === '' && /[$`\\]/.test(body)) return undefined
+  // bash 3.2 (macOS /bin/bash) closes the `$(` at the first unmatched `)` in
+  // the body and runs what follows, so only balanced parentheses are read.
+  if (!balanced(body)) return undefined
   // A substitution drops every trailing newline of its output.
   return { text: body.replace(/\n+$/, ''), length: at + close[0].length - start }
 }
 
 // Unquoted characters whose meaning never depends on the shell. `#` starts a
-// comment only at the start of a word, which is checked apart.
+// comment, and in zsh `=` expands to a command's path, only at the start of
+// a word, which is checked apart.
 const LITERAL = /[A-Za-z0-9._/@+#=:,%-]/
 
 // The words a simple command passes, as the shell would pass them, or
@@ -76,7 +92,7 @@ export function shellWords(command: string): string[] | undefined {
       if (quoted === undefined) return undefined
       word = (word ?? '') + quoted.text
       i = quoted.end + 1
-    } else if (LITERAL.test(c) && !(c === '#' && word === undefined)) {
+    } else if (LITERAL.test(c) && !((c === '#' || c === '=') && word === undefined)) {
       word = (word ?? '') + c
       i++
     } else {
@@ -150,9 +166,13 @@ const GH: Readonly<Record<string, Spec>> = {
 
 // Control characters could move the cursor or recolor the transcript, and so
 // redraw what the person reads; they are shown as escapes instead.
-// Bidi overrides and zero-width characters reorder or hide text the same way.
+// Bidi overrides, zero-width, filler and tag characters reorder or hide
+// text the same way.
 function visible(text: string): string {
-  return text.replace(/[\u0000-\u0008\u000b-\u001f\u007f-\u009f\u200b-\u200f\u2028-\u202e\u2060-\u2069\ufeff]/g, c => `\\u{${c.charCodeAt(0).toString(16)}}`)
+  return text.replace(
+    /[\u0000-\u0008\u000b-\u001f\u007f-\u009f\u00ad\u034f\u115f\u1160\u200b-\u200f\u2028-\u202e\u2060-\u206f\u3164\ufe00-\ufe0f\ufeff\uffa0\u{e0000}-\u{e0fff}]/gu,
+    c => `\\u{${(c.codePointAt(0) ?? 0).toString(16)}}`,
+  )
 }
 
 function oneLine(text: string): string {
