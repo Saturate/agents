@@ -62,7 +62,7 @@ test('an apostrophe in a double-quoted message does not hide later commands', ()
 
 test('a substitution inside double quotes is still a command', () => {
   expect(commandSegments('echo "$(git push)"')).toContain('git push')
-  expect(commandSegments('out="$(git push 2>&1)"')).toContain('git push 2>')
+  expect(commandSegments('out="$(git push 2>&1)"')).toContain('git push 2>&1')
 })
 
 test('shell keywords and binary paths do not hide a command', () => {
