@@ -53,6 +53,9 @@ const PREFIXES = [
   /^\/?(?:[\w.-]+\/)+(?=[\w.-]+(?:\s|$))/,
   // Environment assignments: FOO=bar git commit
   /^[A-Za-z_][A-Za-z0-9_]*=(?:'[^']*'|"[^"]*"|\S*)\s+/,
+  // A redirection may come first: `>&2 git push` is a push.
+  // `>&2>&1 git push` chains them with no space between.
+  /^(?:\d*|&)[<>]+&?[ \t]*[^\s<>&]*(?=[<>&]|\s)\s*/,
   // A case-insensitive filesystem (macOS) runs `ENV` and `NOHUP` too.
   /^(?:sudo|command|exec|time|nohup|env)\s+/i,
 ]
@@ -93,34 +96,48 @@ function closingParen(text: string, open: number): number {
 // `$(` would cut `PATH=$(pwd)/bin git push` into pieces that match nothing.
 // One left-to-right pass, because an apostrophe inside double quotes must not
 // pair with a later single quote.
-function blankQuotes(text: string): { outer: string; inner: string[] } {
+function blankQuotes(text: string): { outer: string; inner: string[]; from: number[]; to: number[] } {
   let outer = ''
   const inner: string[] = []
+  // Where each character of `outer` came from in `text`, so a part can be
+  // shown as written: from[k] is where it starts, to[k] where it ends.
+  const from: number[] = []
+  const to: number[] = []
+  const emit = (chars: string, start: number, end: number) => {
+    outer += chars
+    for (let k = 0; k < chars.length; k++) {
+      from.push(start)
+      to.push(end)
+    }
+  }
   for (let i = 0; i < text.length; ) {
     const c = text[i]
     if (c === '\\' && /^\r?\n/.test(text.slice(i + 1, i + 3))) {
       // A backslash-newline continues the command, so `git push \` with
       // `--force` on the next line is one force push. Handled here rather
       // than up front so an escaped `\\` at a line end still ends the line.
-      outer += ' '
-      i += text[i + 1] === '\r' ? 3 : 2
+      const next = i + (text[i + 1] === '\r' ? 3 : 2)
+      emit(' ', i, next)
+      i = next
     } else if (c === '\\') {
-      outer += text.slice(i, i + 2)
+      emit(text.slice(i, i + 2), i, Math.min(i + 2, text.length))
       i += 2
     } else if (text.startsWith('$(', i)) {
       const close = closingParen(text, i + 1)
       inner.push(text.slice(i + 2, close))
-      outer += '""'
+      emit('""', i, Math.min(close + 1, text.length))
       i = close + 1
     } else if (c === '`') {
       const close = text.indexOf('`', i + 1)
       inner.push(text.slice(i + 1, close === -1 ? text.length : close))
-      outer += '""'
-      i = close === -1 ? text.length : close + 1
+      const next = close === -1 ? text.length : close + 1
+      emit('""', i, next)
+      i = next
     } else if (c === "'") {
       const end = text.indexOf("'", i + 1)
-      outer += "''"
-      i = end === -1 ? text.length : end + 1
+      const next = end === -1 ? text.length : end + 1
+      emit("''", i, next)
+      i = next
     } else if (c === '"') {
       let j = i + 1
       while (j < text.length && text[j] !== '"') {
@@ -138,14 +155,14 @@ function blankQuotes(text: string): { outer: string; inner: string[] } {
           j++
         }
       }
-      outer += '""'
+      emit('""', i, Math.min(j + 1, text.length))
       i = j + 1
     } else {
-      outer += c
+      emit(c ?? '', i, i + 1)
       i++
     }
   }
-  return { outer, inner }
+  return { outer, inner, from, to }
 }
 
 // Past this many nested substitutions the rest is not split further; only a
@@ -156,13 +173,37 @@ const MAX_DEPTH = 20
 // matched on its own. Heredoc bodies are dropped first: a commit message
 // whose body has a line starting with `git push` is not a push. The rest of
 // the line that opens the heredoc still runs, so it is kept.
-function split(command: string): { parts: string[]; inner: string[] } {
+// The body is blanked to spaces rather than cut so every position still lines
+// up with the command as written.
+function split(command: string): { parts: string[]; sources: string[]; inner: string[] } {
   const withoutHeredocs = command.replace(
-    /<<-?\s*(['"]?)([A-Za-z_][A-Za-z0-9_]*)\1([^\n]*)\n[\s\S]*?\n\s*\2(?=\n|$)/g,
-    (_whole: string, _quote: string, _word: string, rest: string) => ` ${rest}`,
+    /<<-?[ \t]*(['"]?)([A-Za-z_][A-Za-z0-9_]*)\1([^\n]*)\n[\s\S]*?\n\s*\2(?=\n|$)/g,
+    (whole: string, _quote: string, _word: string, rest: string) => {
+      const at = whole.indexOf('\n') - rest.length
+      return ' '.repeat(at) + rest + ' '.repeat(whole.length - at - rest.length)
+    },
   )
-  const { outer, inner } = blankQuotes(withoutHeredocs)
-  return { parts: outer.split(/\|\||&&|[;|&\n]|[()]/), inner }
+  const { outer, inner, from, to } = blankQuotes(withoutHeredocs)
+  const parts: string[] = []
+  const sources: string[] = []
+  let start = 0
+  // `2>&1` and `&>` are redirections, not a background `&`. After an escaped
+  // `\>` (an odd run of backslashes) the `&` is one again, and so it is after
+  // zsh's number glob `<->` or `<1-9>`.
+  for (const m of outer.matchAll(/\|\||&&|\|&|(?:(?<!(?:^|[^\\])(?:\\\\)*[<>])|(?<=<\d*-\d*>))&(?!>)|[;|\n]|[()]/g)) {
+    parts.push(outer.slice(start, m.index))
+    sources.push(source(command, from, to, start, m.index))
+    start = m.index + m[0].length
+  }
+  parts.push(outer.slice(start))
+  sources.push(source(command, from, to, start, outer.length))
+  return { parts, sources, inner }
+}
+
+function source(command: string, from: number[], to: number[], start: number, end: number): string {
+  const first = from[start]
+  const last = to[end - 1]
+  return end > start && first !== undefined && last !== undefined ? command.slice(first, last) : ''
 }
 
 // The rules are written in lower case. A case-insensitive filesystem (macOS)
@@ -187,6 +228,15 @@ export function commandSegments(command: string, depth = 0): string[] {
   const segments = parts.map(stripPrefixes).map(canonical).filter(segment => segment.length > 0)
   if (depth >= MAX_DEPTH) return segments
   return [...segments, ...inner.flatMap(body => commandSegments(body, depth + 1))]
+}
+
+// Each command of the call itself as matched (prefixes stripped, quotes
+// blanked) next to the text it was written as, prefixes and quotes kept.
+export function outerParts(command: string): { segment: string; source: string }[] {
+  const { parts, sources } = split(command)
+  return parts
+    .map((part, i) => ({ segment: canonical(stripPrefixes(part)), source: (sources[i] ?? '').trim() }))
+    .filter(part => part.segment.length > 0)
 }
 
 // The commands of the call itself, without the bodies of `$(...)`, each with

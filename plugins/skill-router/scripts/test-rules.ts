@@ -11,7 +11,7 @@ const here = dirname(fileURLToPath(import.meta.url))
 const rules = parseRules(readFileSync(join(here, 'advisor-rules.conf'), 'utf8'))
 const none = new Set<string>()
 
-// Expected verdicts: 'allow', 'gate', or 'block:<skills, comma-separated>'.
+// Expected verdicts: 'allow', 'gate', 'gate:<gate names>' or 'block:<skills, comma-separated>'.
 const commands: Array<[string, string]> = [
   ['gh issue create --title x --body y', 'gate'],
   ['gh pr review 12 --approve', 'gate'],
@@ -40,7 +40,36 @@ const commands: Array<[string, string]> = [
   ['az repos pr update --id 5 --description me@example.com', 'gate'],
   ['az repos pr list --creator me@example.com', 'allow'],
   ['git push --force origin main', 'gate'],
-  ['git push --force-with-lease', 'gate'],
+  ['git push --force-with-lease', 'gate:confirm-destructive'],
+  ['git push -q --force-with-lease origin fix/atomic-release-push', 'gate:confirm-lease'],
+  ['git push origin fix/x --force-with-lease -u', 'gate:confirm-lease'],
+  ['git push --quiet origin --force-with-lease fix/x', 'gate:confirm-lease'],
+  ['git add tests && git commit --amend --no-edit && git push --force-with-lease origin fix/x && echo pushed', 'block:commit'],
+  ['git push --force-with-lease --force origin fix/x', 'gate:confirm-destructive'],
+  ['git push --force-w origin fix/x', 'gate:confirm-destructive'],
+  ['git push --forc origin main', 'gate:confirm-destructive'],
+  ['git push --follow-tags origin main', 'block:push'],
+  ['git push --force origin main 2>&1 | tail -1', 'gate:confirm-destructive'],
+  ['echo \\>& git push --force origin main', 'gate:confirm-destructive'],
+  ['echo \\<& git push --force origin main', 'gate:confirm-destructive'],
+  ['git push -o x\\\\>&1 --force origin main', 'gate:confirm-destructive'],
+  ['true; >&2 git push --force origin main', 'gate:confirm-destructive'],
+  ['>&2>&1 git push --force origin main', 'gate:confirm-destructive'],
+  ['true <->&git push --force origin main', 'gate:confirm-destructive'],
+  ['ls <1-9>&git reset --hard', 'gate:confirm-destructive'],
+  ['2>&2>&- git reset --hard', 'gate:confirm-destructive'],
+  ['>&2&>x git push --force origin main', 'gate:confirm-destructive'],
+  ['2>/dev/null git push --force origin main', 'gate:confirm-destructive'],
+  ['cat <<\r\nEOF\ngit push --force origin main\nEOF', 'gate:confirm-destructive'],
+  ['git push --force-with-lease -f origin fix/x', 'gate:confirm-destructive'],
+  ['git push --force-with-lease origin +fix/x', 'gate:confirm-destructive'],
+  ['git push --force-with-lease origin fix/x:main', 'gate:confirm-destructive'],
+  ['git push --force-with-lease origin fix/x other', 'gate:confirm-destructive'],
+  ['git push --force-with-lease=fix/x:abc origin fix/x', 'gate:confirm-destructive'],
+  ['git push --force-with-lease origin "fix/x"', 'gate:confirm-destructive'],
+  ['git push --force-with-lease git@github.com:me/repo.git fix/x', 'gate:confirm-destructive'],
+  ['git push --force-with-lease --repo=other origin fix/x', 'gate:confirm-destructive'],
+  ['git push origin fix/x', 'block:push'],
   ['git push -f', 'gate'],
   ['git push origin +main', 'gate'],
   ['git reset --hard HEAD~1', 'gate'],
@@ -109,9 +138,11 @@ const tools: Array<[string, string]> = [
   ['mcp__ado__repo_pull_request', 'allow'],
 ]
 
-function verdictOf(targets: string[], target: 'command' | 'tool'): string {
+function verdictOf(targets: string[], target: 'command' | 'tool', detail: boolean): string {
   const verdict = judge(rules, targets, target, none)
-  return verdict.kind === 'block' ? `block:${[...verdict.missing].sort().join(',')}` : verdict.kind
+  if (verdict.kind === 'block') return `block:${[...verdict.missing].sort().join(',')}`
+  if (verdict.kind === 'gate' && detail) return `gate:${verdict.gates.flatMap(g => g.skills).join(',')}`
+  return verdict.kind
 }
 
 function normalize(expected: string): string {
@@ -120,14 +151,14 @@ function normalize(expected: string): string {
 
 let failed = 0
 for (const [command, expected] of commands) {
-  const got = verdictOf(commandSegments(command), 'command')
+  const got = verdictOf(commandSegments(command), 'command', expected.startsWith('gate:'))
   if (got !== normalize(expected)) {
     failed++
     console.log(`FAIL ${JSON.stringify(command)}: want ${normalize(expected)}, got ${got}`)
   }
 }
 for (const [tool, expected] of tools) {
-  const got = verdictOf([tool], 'tool')
+  const got = verdictOf([tool], 'tool', expected.startsWith('gate:'))
   if (got !== normalize(expected)) {
     failed++
     console.log(`FAIL tool ${tool}: want ${expected}, got ${got}`)

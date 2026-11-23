@@ -8,6 +8,8 @@ const CONF = [
   'block\t^[[:space:]]*git[[:space:]]+commit\tcommit',
   'block-tool\t^mcp__.+__repo_pull_request_write$\tmake-pr',
   'gate-tool\t^mcp__.+__repo_pull_request_thread_write$\tdraft-first\tThis posts a comment on a pull request.',
+  'gate\t^[[:space:]]*git[[:space:]]+push([[:space:]]+(-q|--quiet|-u|--set-upstream|--force-with-lease))*([[:space:]]+--force-with-lease([[:space:]]+(-q|--quiet|-u|--set-upstream|--force-with-lease))*[[:space:]]+[A-Za-z0-9_][A-Za-z0-9_.-]*([[:space:]]+(-q|--quiet|-u|--set-upstream|--force-with-lease))*[[:space:]]+[A-Za-z0-9_][A-Za-z0-9_./-]*|[[:space:]]+[A-Za-z0-9_][A-Za-z0-9_.-]*([[:space:]]+(-q|--quiet|-u|--set-upstream|--force-with-lease))*[[:space:]]+--force-with-lease([[:space:]]+(-q|--quiet|-u|--set-upstream|--force-with-lease))*[[:space:]]+[A-Za-z0-9_][A-Za-z0-9_./-]*|[[:space:]]+[A-Za-z0-9_][A-Za-z0-9_.-]*([[:space:]]+(-q|--quiet|-u|--set-upstream|--force-with-lease))*[[:space:]]+[A-Za-z0-9_][A-Za-z0-9_./-]*([[:space:]]+(-q|--quiet|-u|--set-upstream|--force-with-lease))*[[:space:]]+--force-with-lease)([[:space:]]+(-q|--quiet|-u|--set-upstream|--force-with-lease))*[[:space:]]*$\tconfirm-lease\tThis force-pushes a branch.',
+  'gate\t^[[:space:]]*git[[:space:]]+push.*--force\tconfirm-destructive\tThis force-pushes.',
   'gate\t^[[:space:]]*git[[:space:]]+reset[[:space:]]+--hard\tconfirm-destructive\tThis discards changes.',
   'gate\t^[[:space:]]*gh[[:space:]]+repo[[:space:]]+fork\tconfirm-each\tThis forks a repository.',
   'gate\t^[[:space:]]*az[[:space:]]+repos[[:space:]]+pr[[:space:]]+(set-vote|update)\tconfirm-external\tThis changes an Azure DevOps PR.',
@@ -37,6 +39,8 @@ type Setup = {
   // The repo `az repos pr show` reports for a PR id.
   azPrRepos?: Record<string, string>
   azShown?: string[]
+  // The default branch `git ls-remote --symref` reports; null when it fails.
+  defaultBranch?: string | null
 }
 
 function engine(on: Parameters<Parameters<typeof test>[1]>[1], setup: Setup) {
@@ -48,6 +52,10 @@ function engine(on: Parameters<Parameters<typeof test>[1]>[1], setup: Setup) {
   })
   on('process.run', (_, e) => {
     if (setup.failing === 'repo') throw new Error('git failed')
+    if (e.argv[0] === 'env' && e.argv.includes('ls-remote')) {
+      const head = setup.defaultBranch === undefined ? 'refs/heads/main' : setup.defaultBranch
+      return { value: { exitCode: head === null ? 128 : 0, stdout: head === null ? '' : `ref: ${head}\tHEAD\nabc123\tHEAD\n`, stderr: '' } }
+    }
     if (e.argv[0] === 'env') {
       const env = setup.env ?? 'PATH=/bin\n'
       return { value: { exitCode: 0, stdout: e.argv[1] === '-0' ? env.split('\n').join('\0') : env, stderr: '' } }
@@ -58,6 +66,19 @@ function engine(on: Parameters<Parameters<typeof test>[1]>[1], setup: Setup) {
       setup.azShown?.push(id)
       const url = setup.azPrRepos?.[id]
       return { value: { exitCode: url === undefined ? 1 : 0, stdout: url === undefined ? '' : JSON.stringify(url.endsWith('#bypass') ? [url.slice(0, -7), true] : [url, null]), stderr: '' } }
+    }
+    if (e.argv[1] === 'rev-parse') {
+      // As git resolves a branch word: full and `heads/` names to the branch they name.
+      const word = e.argv[3] ?? ''
+      const ref = word.startsWith('refs/') ? word : word.startsWith('heads/') ? `refs/${word}` : `refs/heads/${word}`
+      return { value: { exitCode: 0, stdout: `${ref}\n`, stderr: '' } }
+    }
+    if (e.argv.includes('-z')) {
+      const remote = setup.remote === undefined ? 'git@example:me/repo.git' : setup.remote
+      const plain = setup.gitConfig ?? (remote === null ? '' : `remote.origin.url ${remote}\nremote.origin.fetch +refs/heads/*:refs/remotes/origin/*\n`)
+      // Entries as `git config -z` prints them; a value with a newline in it is written as \\n here.
+      const z = plain.split('\n').filter(l => l.length > 0).map(l => `${l.replace(' ', '\n').replaceAll('\\n', '\n')}\0`).join('')
+      return { value: { exitCode: z === '' ? 1 : 0, stdout: z, stderr: '' } }
     }
     const remote = setup.remote === undefined ? 'git@example:me/repo.git' : setup.remote
     const stdout = setup.gitConfig ?? (remote === null ? '' : `remote.origin.url ${remote}\nremote.origin.fetch +refs/heads/*:refs/remotes/origin/*\n`)
@@ -456,7 +477,7 @@ test('the full command is shown in the transcript before the dialog', async ($, 
   await $.tool.call({ tool: 'Bash', command: 'gh pr comment 1 --body "the full body text"' })
 
   expect(setup.logged?.join('\n')).toContain('the full body text')
-  expect(setup.asked[0]).toContain('shown above')
+  expect(setup.asked[0]).toContain('(full text in the transcript)')
 })
 
 test('allow for this session skips the dialog until reset, and is never stored', async ($, on) => {
@@ -604,4 +625,146 @@ test('an az command never gets always allow from its plain arguments alone', asy
 
   expect(setup.offered?.[0]).not.toContain('Always')
   expect(setup.azShown).toEqual([])
+})
+
+const LEASE = 'git push -q --force-with-lease origin fix/x'
+
+test('a lease push to a feature branch can be allowed for the project', async ($, on) => {
+  const setup: Setup = { answer: 'Always allow in this project', ran: [], asked: [], offered: [] }
+  engine(on, setup)
+
+  await $.tool.call({ tool: 'Bash', command: LEASE })
+  await $.tool.call({ tool: 'Bash', command: LEASE })
+
+  expect(setup.offered?.[0]).toContain('Always allow in this project')
+  expect(setup.asked.length).toBe(1)
+  expect(setup.ran).toEqual([LEASE, LEASE])
+})
+
+test('a lease push to the default branch, or with no known default, asks every time', async ($, on) => {
+  const setup: Setup = { answer: 'Always allow in this project', ran: [], asked: [], offered: [] }
+  engine(on, setup)
+
+  await $.tool.call({ tool: 'Bash', command: 'git push --force-with-lease origin Main' })
+  setup.defaultBranch = null
+  await $.tool.call({ tool: 'Bash', command: LEASE })
+  setup.defaultBranch = undefined
+  setup.gitConfig = 'remote.origin.url git@example:me/repo.git\nremote.origin.pushurl git@example:them/repo.git\n'
+  await $.tool.call({ tool: 'Bash', command: LEASE })
+  setup.gitConfig = 'remote.origin.url git@example:me/repo.git\nurl.git@example:them/.insteadof git@example:me/\n'
+  await $.tool.call({ tool: 'Bash', command: LEASE })
+  setup.defaultBranch = 'refs/heads/fix/x'
+  setup.gitConfig = undefined
+  await $.tool.call({ tool: 'Bash', command: LEASE })
+  setup.gitConfig = undefined
+  await $.tool.call({ tool: 'Bash', command: 'git push --force-with-lease upstream fix/x' })
+  await $.tool.call({ tool: 'Bash', command: 'git push --force-with-lease origin HEAD' })
+  await $.tool.call({ tool: 'Bash', command: 'git push --force origin fix/x' })
+  await $.tool.call({ tool: 'Bash', command: 'git push --force-with-lease origin refs/heads/main' })
+  await $.tool.call({ tool: 'Bash', command: 'git push --force-with-lease origin heads/main' })
+  await $.tool.call({ tool: 'Bash', command: 'git push --force-with-lease origin head' })
+  setup.defaultBranch = undefined
+  setup.gitConfig = 'remote.origin.url git@example:me/repo.git\npush.default upstream\n'
+  await $.tool.call({ tool: 'Bash', command: LEASE })
+
+  expect(setup.asked.length).toBe(12)
+  for (const offered of setup.offered ?? []) expect(offered).not.toContain('Always')
+})
+
+test('the question names the command that tripped the gate', async ($, on) => {
+  const setup: Setup = { answer: "Don't run", ran: [], asked: [] }
+  engine(on, setup)
+
+  await $.tool.call({ tool: 'Bash', command: "python3 - <<'PY'\nprint(1)\nPY\ngit add x && git push -q --force-with-lease origin fix/x" })
+  await $.tool.call({ tool: 'Bash', command: 'git reset --hard' })
+  await $.tool.call({ tool: 'Bash', command: 'cd /repo && git push --force origin "fix/x"' })
+  await $.tool.call({ tool: 'Bash', command: 'git -C ../other push --force origin main 2>&1 | tail -1' })
+  await $.tool.call({ tool: 'Bash', command: "B=/tmp/body.md && cat > $B <<'EOF'\nThe body\nEOF\ngh pr comment 3 --body-file $B" })
+
+  expect(setup.asked[0]).toContain('Run `git push -q --force-with-lease origin fix/x` and 2 other commands (full text in the transcript)?')
+  expect(setup.asked[1]).toContain('Run `git reset --hard`?')
+  expect(setup.asked[2]).toContain('Run `git push --force origin "fix/x"` and 1 other command (full text in the transcript)?')
+  expect(setup.asked[3]).toContain("Run `git -C ../other push --force origin main 2>&1` and 1 other command")
+  expect(setup.asked[4]).toContain('Run `gh pr comment 3 --body-file $B` and 2 other commands')
+})
+
+test('a url rewrite for another host does not take away the allow', async ($, on) => {
+  const setup: Setup = { answer: "Don't run", ran: [], asked: [], offered: [] }
+  engine(on, setup)
+  setup.gitConfig = 'remote.origin.url git@example:me/repo.git\nurl.git@github.com:.insteadof https://github.com/\n'
+
+  await $.tool.call({ tool: 'Bash', command: LEASE })
+
+  expect(setup.offered?.[0]).toContain('Always allow in this project')
+})
+
+test('the question names a gate still asking, and joins a continued line', async ($, on) => {
+  const setup: Setup = { answer: 'Allow for this session', ran: [], asked: [] }
+  engine(on, setup)
+
+  await $.tool.call({ tool: 'Bash', command: 'gh pr comment 1 --body a' })
+  setup.answer = "Don't run"
+  await $.tool.call({ tool: 'Bash', command: 'gh pr comment 1 --body a && git push \\\n  --force origin main' })
+
+  expect(setup.asked[1]).toContain('Run `git push --force origin main` and 1 other command')
+})
+
+test('a heredoc opener split across lines does not hide the command after it', async ($, on) => {
+  const setup: Setup = { answer: "Don't run", ran: [], asked: [] }
+  engine(on, setup)
+
+  await $.tool.call({ tool: 'Bash', command: 'cat <<\r\nEOF && true\nbody\nEOF\n\r\ngit push --force origin main' })
+
+  expect(setup.asked.length).toBe(1)
+  expect(setup.ran).toEqual([])
+})
+
+test('receivepack, uploadpack or any unknown remote key takes away the lease allow', async ($, on) => {
+  const setup: Setup = { answer: "Don't run", ran: [], asked: [], offered: [] }
+  engine(on, setup)
+  for (const key of ['receivepack git-receive-pack /x.git #', 'uploadpack git-upload-pack /x.git #', 'vcs foo']) {
+    setup.gitConfig = `remote.origin.url git@example:me/repo.git\nremote.origin.${key}\n`
+    await $.tool.call({ tool: 'Bash', command: LEASE })
+  }
+  setup.gitConfig = 'remote.origin.url git@example:me/repo.git\nremote.origin.fetch +refs/heads/*:refs/remotes/origin/*\nremote.pushdefault origin\n'
+  await $.tool.call({ tool: 'Bash', command: LEASE })
+
+  expect(setup.offered?.slice(0, 3).every(o => !o.includes('Always'))).toBe(true)
+  expect(setup.offered?.[3]).toContain('Always allow in this project')
+})
+
+test('with a lease push and a force push, the question names the force push', async ($, on) => {
+  const setup: Setup = { answer: "Don't run", ran: [], asked: [] }
+  engine(on, setup)
+
+  await $.tool.call({ tool: 'Bash', command: 'git push --force-with-lease origin feat; git push --force origin main' })
+
+  expect(setup.asked[0]).toContain('Run `git push --force origin main` and 1 other command')
+})
+
+test('a key is read apart from its value, and push settings that widen a push take away the allow', async ($, on) => {
+  const setup: Setup = { answer: "Don't run", ran: [], asked: [], offered: [] }
+  engine(on, setup)
+  for (const extra of ['remote.origin.pushurl /x/other.url x', 'push.followtags true', 'push.recursesubmodules on-demand', 'push.pushoption ci.skip']) {
+    setup.gitConfig = `remote.origin.url git@example:me/repo.git\n${extra}\n`
+    await $.tool.call({ tool: 'Bash', command: LEASE })
+  }
+  setup.gitConfig = 'remote.origin.url git@example:me/repo.git\npush.autosetupremote true\npush.default simple\n'
+  await $.tool.call({ tool: 'Bash', command: LEASE })
+
+  expect(setup.offered?.slice(0, 4).every(o => !o.includes('Always'))).toBe(true)
+  expect(setup.offered?.[4]).toContain('Always allow in this project')
+})
+
+test('a lease push with a no-break space or vertical tab between words is not allowed', async ($, on) => {
+  const setup: Setup = { answer: 'Always allow in this project', ran: [], asked: [], offered: [] }
+  engine(on, setup)
+
+  await $.tool.call({ tool: 'Bash', command: LEASE })
+  setup.answer = "Don't run"
+  await $.tool.call({ tool: 'Bash', command: 'git push --force-with-lease origin\u00a0-q fix/x' })
+  await $.tool.call({ tool: 'Bash', command: 'git push --force-with-lease origin\v-q fix/x' })
+
+  expect(setup.asked.length).toBe(3)
+  expect(setup.ran).toEqual([LEASE])
 })

@@ -13,6 +13,8 @@ export type Shown = {
   // The command (`az repos pr update`) and its fields, when read exactly.
   name?: string
   values?: Readonly<Record<string, string>>
+  // How many other commands run alongside the one `head` names.
+  others?: number
 }
 
 // The opener of `"$(cat <<'EOF' ... EOF)"`, how Claude passes multi-line text.

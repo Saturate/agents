@@ -2,7 +2,7 @@ import type { EngineInterface, Register } from 'claude-code'
 
 import { block, formatCommand, formatTool } from './format'
 import type { Shown } from './format'
-import { commandSegments, judge, outerSegments, parseRules, ruleId, skillName } from './rules'
+import { commandSegments, judge, outerParts, outerSegments, parseRules, ruleId, skillName } from './rules'
 import type { Rule } from './rules'
 
 const MAIN = 'main'
@@ -119,6 +119,9 @@ function isGated(gates: readonly Rule[], segment: string): boolean {
 // (a `cd` however it is spelled, a prefix, an odd flag) means the dialog asks.
 function plainCall(command: string, gates: readonly Rule[]): boolean {
   const outer = outerSegments(command)
+  // The rules read a no-break space or a vertical tab as a word break; the
+  // shell doesn't, so `origin<NBSP>-q` would be one word to git and two here.
+  if (outer.some(segment => /[^\x20-\x7e\t]/.test(segment))) return false
   const gatedEverywhere = commandSegments(command).filter(s => isGated(gates, s)).length
   if (outer.filter(s => isGated(gates, s)).length !== gatedEverywhere) return false
   return outer.every(segment => {
@@ -194,6 +197,89 @@ function stringArg(e: object, name: string): string | undefined {
   return typeof value === 'string' ? value : undefined
 }
 
+// Remote keys that don't change where a push goes or what ls-remote reads.
+// pushurl, push, receivepack, uploadpack, vcs and anything new mean asking.
+const HARMLESS_REMOTE_KEYS = new Set(['url', 'fetch', 'tagopt', 'prune', 'prunetags', 'skipfetchall', 'skipdefaultupdate', 'promisor', 'partialclonefilter'])
+
+// push.* keys that don't widen what an explicit `git push <remote> <branch>`
+// sends: followTags pushes tags, recurseSubmodules pushes other repos,
+// pushOption talks to the server. push.default is judged on its value.
+const HARMLESS_PUSH_KEYS = new Set(['default', 'autosetupremote', 'useforceifincludes', 'negotiate', 'usebitmaps', 'gpgsign'])
+
+type ConfigEntry = { key: string; value: string }
+
+// `git config -z` ends each entry with NUL and puts a newline between key and
+// value, so a value can't pass for a key the way it can in the plain output.
+function configEntries(stdout: string): ConfigEntry[] {
+  return stdout
+    .split('\0')
+    .filter(record => record.length > 0)
+    .map(record => {
+      const nl = record.indexOf('\n')
+      return nl === -1 ? { key: record, value: '' } : { key: record.slice(0, nl), value: record.slice(nl + 1) }
+    })
+}
+
+function configHarmless({ key, value }: ConfigEntry): boolean {
+  const lower = key.toLowerCase()
+  // `remote.pushDefault` has no remote name, and an explicit remote wins over it.
+  if (lower === 'remote.pushdefault') return true
+  const remote = /^remote\..+\.([^.]+)$/.exec(lower)
+  if (remote?.[1] !== undefined) return HARMLESS_REMOTE_KEYS.has(remote[1])
+  const push = /^push\.([^.]+)$/.exec(lower)
+  if (push?.[1] !== undefined) return HARMLESS_PUSH_KEYS.has(push[1]) && !(push[1] === 'default' && /^(?:upstream|tracking)$/i.test(value))
+  return lower.startsWith('url.')
+}
+
+function isLease(gate: Rule): boolean {
+  return gate.skills.includes('confirm-lease')
+}
+
+// A lease push may be allowed only where it lands on a branch other than the
+// remote's default, on the repo the scope names.
+// - A push URL, push refspecs or a url.*.insteadOf rewrite of this remote
+//   would send it somewhere else.
+// - With push.default upstream (or tracking), `git push origin feat` goes to
+//   feat's upstream, which is main for a branch made from origin/main.
+// - The word must name a local branch by its own name: `refs/heads/main`,
+//   `heads/main`, a tag, or `head` (HEAD on a case-insensitive filesystem)
+//   would push something else.
+// - The default is asked of the remote, not read from origin/HEAD: that is
+//   local state an earlier command could have moved, and goes stale when the
+//   default changes on the server. No answer means asking.
+async function leaseOffDefault($: EngineInterface, command: string, gates: readonly Rule[]): Promise<boolean> {
+  const lease = gates.filter(isLease)
+  const cwd = await $.session.cwd()
+  const config = await $.process.run(['git', 'config', '-z', '--get-regexp', '^(remote|url|push)\\.'], { cwd })
+  // Exit 1 means no key matched, which can't be: a lease push needs a remote.
+  if (config.exitCode !== 0) return false
+  const entries = configEntries(config.stdout)
+  if (!entries.every(configHarmless)) return false
+  const remotes = entries.flatMap(({ key, value }) => {
+    const name = /^remote\.(.+)\.url$/i.exec(key)?.[1]
+    return name === undefined ? [] : [{ name, url: value }]
+  })
+  const only = remotes.length === 1 ? remotes[0] : undefined
+  if (only === undefined) return false
+  const rewrites = entries.flatMap(({ key, value }) => (/^url\..*\.(?:insteadof|pushinsteadof)$/i.test(key) ? [value] : []))
+  if (rewrites.some(prefix => only.url.startsWith(prefix))) return false
+  for (const segment of outerSegments(command)) {
+    if (!lease.some(g => g.pattern.test(segment))) continue
+    const [remote, branch] = segment.trim().split(/\s+/).slice(2).filter(w => !w.startsWith('-'))
+    if (remote === undefined || branch === undefined || only.name !== remote || branch.toLowerCase() === 'head') return false
+    const ref = await $.process.run(['git', 'rev-parse', '--symbolic-full-name', branch], { cwd })
+    if (ref.exitCode !== 0 || ref.stdout.trim() !== `refs/heads/${branch}`) return false
+    // No one answers a credential prompt here; failing means asking. The
+    // user's own ssh setup is kept, so a passphrase prompt runs to the timeout.
+    const head = await $.process.run(['env', 'GIT_TERMINAL_PROMPT=0', 'GCM_INTERACTIVE=never', 'git', 'ls-remote', '--symref', remote, 'HEAD'], { cwd, timeoutMs: 10000 })
+    const target = /^ref: (refs\/heads\/\S+)\tHEAD$/m.exec(head.stdout)?.[1]
+    // Case is folded because a case-insensitive filesystem resolves `Main` to
+    // the local main branch.
+    if (head.exitCode !== 0 || target === undefined || target.toLowerCase() === `refs/heads/${branch}`.toLowerCase()) return false
+  }
+  return true
+}
+
 // Fields that point az at another organization or let a PR skip policy.
 const AZ_ELSEWHERE = ['Org', 'Detect', 'Subscription', 'Bypass policy', 'Bypass reason']
 
@@ -225,7 +311,9 @@ async function azScope($: EngineInterface, shown: Shown): Promise<string | undef
 // names its own Azure DevOps project and repo, which may not be this one.
 async function scopeOf($: EngineInterface, e: object & { tool: string }, command: string | undefined, shown: Shown, gates: readonly Rule[]): Promise<string | undefined> {
   if (command !== undefined) {
-    return plainCall(command, gates) ? soleRemote($) : azScope($, shown)
+    if (!plainCall(command, gates)) return azScope($, shown)
+    if (gates.some(isLease) && !(await leaseOffDefault($, command, gates))) return undefined
+    return soleRemote($)
   }
   // Bypassing branch policy is a decision about that one PR.
   if (Reflect.get(e, 'bypassPolicy') === true) return undefined
@@ -306,6 +394,32 @@ async function bodyFiles($: EngineInterface, command: string, shown: Shown, gate
   return parts.join('\n')
 }
 
+// A command the layout couldn't read is named in the question by the command
+// that tripped the gate, not by its first line: in `python3 - <<'PY' ... &&
+// git push --force-with-lease` the push is what is being asked about. It is
+// quoted as written, `-C dir` and `GIT_DIR=` included, since those say where
+// it runs; one inside a `$(...)` has only its matched form, quotes blanked.
+function gatedHead(shown: Shown, command: string, all: readonly Rule[], gates: readonly Rule[], zsh: boolean): Shown {
+  if (shown.name !== undefined) return shown
+  const others = commandSegments(command).length - 1
+  // The gate a part gets is the first rule it matches, as in judge. A force
+  // push beside a lease push is the one to name.
+  const gateOf = (segment: string) => {
+    const rule = all.find(r => r.target === 'command' && r.pattern.test(segment))
+    return rule !== undefined && gates.includes(rule) ? rule : undefined
+  }
+  const parts = outerParts(command)
+  const part = parts.find(p => {
+    const gate = gateOf(p.segment)
+    return gate !== undefined && neverAlways(gate)
+  }) ?? parts.find(p => gateOf(p.segment) !== undefined)
+  // A push split over lines with `\` would show as `git push \` alone.
+  if (part !== undefined) return { ...shown, head: formatCommand(part.source.replace(/[ \t]*\\\r?\n[ \t]*/g, ' '), zsh).head, others }
+  const hit = commandSegments(command).find(s => isGated(gates, s))
+  if (hit === undefined) return shown
+  return { ...shown, head: hit.trim().replace(/""|''/g, '"…"'), others }
+}
+
 // The engine refuses AskUserQuestion through $.tool.call and $.ui.ask has no
 // preview box, so the full command goes into the transcript as its own row
 // just above the dialog, where it is drawn whole instead of squashed into
@@ -320,7 +434,9 @@ async function approve($: EngineInterface, gates: readonly Rule[], shown: Shown,
     // The call is named in the question too: a phone card over Remote
     // Control may show only the dialog, not the log row above it.
     const head = shown.head.slice(0, 200).replaceAll('`', "'")
-    answer = await $.ui.ask(`${messages} Run \`${head}\` (full text shown above)?`, {
+    const others = shown.others === undefined || shown.others === 0 ? '' : ` and ${shown.others} other command${shown.others === 1 ? '' : 's'}`
+    const more = shown.text === shown.head ? '' : ' (full text in the transcript)'
+    answer = await $.ui.ask(`${messages} Run \`${head}\`${others}${more}?`, {
       header: 'Approve',
       options: [RUN, ...(canSession ? [SESSION] : []), ...(canAlways ? [ALWAYS] : []), DONT_RUN],
     })
@@ -428,8 +544,15 @@ export const register: Register = on => {
     if (e.tool === 'Skill' || e.tool === 'AskUserQuestion') return next(e)
     const all = await loadRules($)
     const command = e.tool === 'Bash' ? e.command : undefined
-    const verdict = command !== undefined
-      ? judge(all, commandSegments(command), 'command', loadedFor(e.agentId))
+    let segments: string[] | undefined
+    try {
+      segments = command === undefined ? undefined : commandSegments(command)
+    } catch {
+      // Failing open here would run a command whose gates were never checked.
+      return { deny: 'skill-router could not split this command into the commands it runs, so it was not run. Run them as separate, simpler calls.' }
+    }
+    const verdict = segments !== undefined
+      ? judge(all, segments, 'command', loadedFor(e.agentId))
       : judge(all, [e.tool], 'tool', loadedFor(e.agentId))
 
     if (verdict.kind === 'block') {
@@ -443,7 +566,8 @@ export const register: Register = on => {
       let refusal: string | undefined
       try {
         // Without a scope the dialog still asks, just without "always".
-        const formatted = command !== undefined ? formatCommand(command, await runsUnderZsh($)) : formatTool(e)
+        const zsh = command !== undefined && (await runsUnderZsh($))
+        const formatted = command !== undefined ? formatCommand(command, zsh) : formatTool(e)
         const scope = await scopeOf($, e, command, formatted, verdict.gates).catch(() => undefined)
         const session = await sessionKey($, scope)
         const allowed = await allowedIn($, scope, session)
@@ -452,7 +576,9 @@ export const register: Register = on => {
           $.ui.log(`skill-router: allowed in ${scope ?? 'this project'} (/gates to review):\n\n${preview(formatted.text)}`)
         } else {
           const files = command !== undefined ? await bodyFiles($, command, formatted, verdict.gates) : ''
-          refusal = await approve($, asking, { ...formatted, text: [formatted.text, files].filter(t => t.length > 0).join('\n') }, scope, session)
+          // Named by a gate still asking, not one already allowed.
+          const named = command !== undefined ? gatedHead(formatted, command, all, asking, zsh) : formatted
+          refusal = await approve($, asking, { ...named, text: [formatted.text, files].filter(t => t.length > 0).join('\n') }, scope, session)
         }
       } catch (error) {
         refusal = `skill-router could not finish asking about this, so it was not run (${error instanceof Error ? error.message : String(error)}).`
