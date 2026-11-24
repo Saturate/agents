@@ -2,11 +2,10 @@
 name: node-package-management
 description: Reference guide for npm, pnpm, yarn, and bun package managers. Covers workspace configuration, security audits, troubleshooting, and migration between package managers. Use for complex monorepo setup, debugging package issues, or deep package manager reference.
 user-invocable: true
-disable-model-invocation: true
 allowed-tools: Read Grep Glob Bash
 metadata:
   author: Saturate
-  version: "1.0"
+  version: "1.1"
 ---
 
 # Node.js Package Management
