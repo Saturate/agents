@@ -65,7 +65,7 @@ Use the `commit` skill for commit guidelines.
 
 # Clipboard
 
-Offer to copy to clipboard when it makes sense that I want to get content for use elsewhere.
+Put text I'll paste elsewhere (an issue body, an email, a message) in a `>` quote, and commands or code in a fenced block, with nothing else inside it. The copy-block mod's hover buttons then copy just that part. Use a clipboard command only when I ask for one:
 
 - macOS: `pbcopy`
 - Linux: `xclip -selection clipboard`

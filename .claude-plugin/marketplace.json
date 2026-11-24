@@ -27,6 +27,12 @@
       "source": "./plugins/secret-mask",
       "description": "Mod that swaps secrets for placeholders before they reach the model and puts them back only in tool calls you approve.",
       "version": "0.2.0"
+    },
+    {
+      "name": "copy-block",
+      "source": "./plugins/copy-block",
+      "description": "Mod that shows copy buttons when you hover a reply in the transcript: the whole reply, one code block, or one quote.",
+      "version": "0.1.0"
     }
   ]
 }
