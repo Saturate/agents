@@ -1,4 +1,5 @@
 import { expect, test } from 'claude-code/testing'
+import type { TestBody } from 'claude-code/testing'
 
 const TEXT = 'Run this:\n\n```sh\nnpm test\n```\n\nThen:\n\n~~~\nls -la\n~~~\n\nUnfinished:\n\n```\nhalf'
 
@@ -138,5 +139,76 @@ test('a summary row is left alone', async ($, on) => {
   })
   const ui = await $.ui.mount(reply('a summary', true))
   expect(await ui.findAll({ type: 'Button' })).toHaveLength(0)
+  await ui.unmount()
+})
+
+function runHarness(on: Parameters<TestBody>[1], box = '') {
+  const fills: string[] = []
+  const ran: string[][] = []
+  const toasts: string[] = []
+  on('prompt.read', () => ({ value: { text: box, cursor: 0 } }))
+  on('prompt.fill', (_, e) => {
+    fills.push(e.text)
+    return { isFilled: true }
+  })
+  on('ui.toast', (_, e) => {
+    toasts.push(String(e.text))
+    return { value: undefined }
+  })
+  on('ui.status', () => ({ value: undefined }))
+  on('env.get', () => ({ value: '/bin/zsh' }))
+  on('process.spawn', async function* (_, e) {
+    ran.push([...e.argv])
+    yield { stream: 'stdout', text: 'hi\n' }
+    return { value: { code: 0, signal: null } }
+  })
+  on('prompt.submit', (_, e) => ({ text: e.text, context: e.context }))
+  on('ui.render', ($, e) => {
+    const { Text } = $.ui.resolve(e)
+    return <Text>engine row</Text>
+  })
+  return { fills, ran, toasts }
+}
+
+const typed = { origin: { kind: 'composer' }, wait: false } as const
+const RUNNABLE = 'Run it:\n\n`! echo hi`\n\nor\n\n```\n! date\n```\n\nnot `!important` or `! a​b`'
+
+test('run fills the prompt box, and Enter on it runs the command for the model', async ($, on) => {
+  const h = runHarness(on)
+  const ui = await $.ui.mount(reply(RUNNABLE))
+  expect((await ui.findAll({ type: 'Button' })).map(b => b.text)).toEqual(['copy all', 'copy code', 'run 1', 'run 2'])
+  await ui.press({ key: 'run-0' })
+  expect(h.fills).toEqual(['!echo hi'])
+
+  // The same text from anywhere but the person's composer runs nothing, and
+  // does not disarm the fill.
+  await $.prompt.submit({ text: '!echo hi', origin: { kind: 'sdk' }, wait: false })
+  expect(h.ran).toHaveLength(0)
+  const submitted = await $.prompt.submit({ text: '!echo hi', ...typed })
+  expect(h.ran).toEqual([['/bin/zsh', '-lc', 'echo hi']])
+  expect(submitted.context?.[0]).toContain('$ echo hi\nExit code: 0\n\n<stdout>\nhi\n</stdout>')
+
+  // Once only.
+  await $.prompt.submit({ text: '!echo hi', ...typed })
+  expect(h.ran).toHaveLength(1)
+  await ui.unmount()
+})
+
+test('any other submit disarms the fill', async ($, on) => {
+  const h = runHarness(on)
+  const ui = await $.ui.mount(reply(RUNNABLE))
+  await ui.press({ key: 'run-0' })
+  await $.prompt.submit({ text: 'never mind', ...typed })
+  await $.prompt.submit({ text: '!echo hi', ...typed })
+  expect(h.ran).toHaveLength(0)
+  await ui.unmount()
+})
+
+test('run never overwrites what the person was typing', async ($, on) => {
+  const h = runHarness(on, 'half a thought')
+  const ui = await $.ui.mount(reply(RUNNABLE))
+  await ui.press({ key: 'run-0' })
+  expect(h.fills).toHaveLength(0)
+  expect(h.toasts).toEqual(['Clear the prompt box first'])
   await ui.unmount()
 })
