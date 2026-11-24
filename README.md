@@ -7,7 +7,7 @@ Skills, plugins, and configuration for AI coding agents. Works with Claude Code,
 ```
 skills/              Shared agent skills (tool-agnostic markdown)
 skills/_shared/      References shared across multiple skills
-plugins/             Plugins (observability, skill-router, secret-mask)
+plugins/             Plugins (observability, skill-router, secret-mask, copy-block)
 claude/              Claude Code config (CLAUDE.md, settings, statusline)
 opencode/            OpenCode config (commands, agents)
 install.sh           Symlinks config for one or both tools
@@ -33,19 +33,21 @@ Skills are also available as a Claude Code plugin:
 /plugin marketplace add Saturate/agents
 ```
 
-Three more plugins install separately:
+Four more plugins install separately:
 
 - [observability](plugins/observability/): logs every hook event to JSONL, with optional Loki/Grafana push.
 - [skill-router](plugins/skill-router/): maps tasks to skills at session start, refuses commands like `git commit` or `gh pr create` until the matching skill has loaded, and asks you to approve external or destructive ones.
 - [secret-mask](plugins/secret-mask/): swaps secrets for placeholders before Claude reads them and only puts them back into tool calls you approve.
+- [copy-block](plugins/copy-block/): hover a reply to copy all of it, one code block, or one quote. Needs `/tui fullscreen`.
 
 ```
 /plugin install observability@Saturate-agents
 /plugin install skill-router@Saturate-agents
 /plugin install secret-mask@Saturate-agents
+/plugin install copy-block@Saturate-agents
 ```
 
-skill-router and secret-mask are [mods](https://code.claude.com/docs/en/plugins/mods/overview) and need Claude Code 2.1.287 or later.
+skill-router, secret-mask and copy-block are [mods](https://code.claude.com/docs/en/plugins/mods/overview) and need Claude Code 2.1.287 or later.
 
 ## Skills
 
