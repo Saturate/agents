@@ -53,6 +53,12 @@ async function ruleSkill($: EngineInterface, name: string): Promise<string | und
   return skillName(entry.name)
 }
 
+// A transcript notice is one line: the terminal draws each line break in it
+// as a replacement glyph, so they are spelled out.
+function oneLine(text: string): string {
+  return text.replace(/\r?\n/g, ' ⏎ ')
+}
+
 function preview(text: string): string {
   if (text.length <= PREVIEW_LIMIT) return text
   return `${text.slice(0, PREVIEW_LIMIT)}…\n(${text.length - PREVIEW_LIMIT} more characters not shown; ask Claude for the full text before approving)`
@@ -420,28 +426,124 @@ function gatedHead(shown: Shown, command: string, all: readonly Rule[], gates: r
   return { ...shown, head: hit.trim().replace(/""|''/g, '"…"'), others }
 }
 
+const PANE = 'skill-router-approve'
+// Rows of the call a remote dialog card holds above the engine's dialog,
+// counted at 40 columns as the card is: the card takes 48 in all, and the
+// question and options need the rest.
+const CARD_ROWS = 24
+// An `open` another plugin's hook holds must not hold the gate: past this the
+// panel counts as not placed and the call is shown in the transcript.
+const OPEN_WAIT_MS = 2000
+
+// Calls waiting on an approval dialog. Each has a question no other waiting
+// call has, so a dialog card never shows another call's text.
+const waiting = new Map<number, { question: string; text: string }>()
+let nextId = 0
+
+// The panel and cards read `waiting`, which the engine cannot see change.
+function changed($: EngineInterface): void {
+  try {
+    $.ui.invalidate('ui.render')
+  } catch {
+    // Nothing draws them (a -p run); there is nothing to redraw.
+  }
+}
+
+function forCard(text: string): string {
+  const lines = text.split('\n')
+  const kept: string[] = []
+  let rows = 0
+  for (const line of lines) {
+    rows += Math.max(1, Math.ceil(line.length / 40))
+    if (rows > CARD_ROWS) break
+    kept.push(line)
+  }
+  const left = lines.length - kept.length
+  if (left === 0) return text
+  return `${kept.join('\n')}\n… (${left} more line${left === 1 ? '' : 's'}; ask Claude for the full text before approving)`
+}
+
+// Whether the panel may be up, and how many calls are opening it: a call
+// finishing closes it only when no other call is waiting or about to wait.
+let paneOpen = false
+let opening = 0
+
+// A panel is opened only when the terminal is the one surface: placement is
+// reported across surfaces, and on the phone an unasked panel takes over the
+// screen and covers the dialog, whose card holds the call there anyway.
+async function openPanel($: EngineInterface): Promise<boolean> {
+  const surfaces = await $.session.surfaces().catch((): readonly string[] => [])
+  if (surfaces.length !== 1 || surfaces[0] !== 'terminal') return false
+  opening += 1
+  try {
+    const open = $.ui.open({ id: PANE, title: 'skill-router: approve' }).catch(() => undefined)
+    // An open that lands after the wait put up a panel nobody is using.
+    void open.then(async opened => {
+      if (opened?.isPlaced === true) {
+        paneOpen = true
+        await closePanelIfIdle($)
+      }
+    })
+    const opened = await Promise.race([
+      open,
+      // A clock that cannot sleep leaves the open to settle alone.
+      $.clock.sleep(OPEN_WAIT_MS).then(() => undefined, () => new Promise<undefined>(() => {})),
+    ])
+    if (opened?.isPlaced === true) {
+      paneOpen = true
+      return true
+    }
+    paneOpen = true
+    return false
+  } finally {
+    opening -= 1
+  }
+}
+
+async function closePanelIfIdle($: EngineInterface): Promise<void> {
+  if (!paneOpen || waiting.size > 0 || opening > 0) return
+  paneOpen = false
+  await $.ui.close({ id: PANE }).catch(() => undefined)
+}
+
 // The engine refuses AskUserQuestion through $.tool.call and $.ui.ask has no
-// preview box, so the full command goes into the transcript as its own row
-// just above the dialog, where it is drawn whole instead of squashed into
-// the question line.
+// preview box, so the full call is drawn beside the dialog instead of
+// squashed into its question line: in a side panel on a wide terminal, and in
+// the dialog card itself on the desktop app, VS Code and the phone. Anywhere
+// else it is a transcript row.
 async function approve($: EngineInterface, gates: readonly Rule[], shown: Shown, scope: string | undefined, session: string | undefined): Promise<string | undefined> {
   const messages = gates.map(g => g.message).join(' ')
   const canAlways = scope !== undefined && !gates.some(neverAlways)
   const canSession = canAlways && session !== undefined
-  $.ui.log(`skill-router asks before running this:\n\n${preview(shown.text)}`)
+  // The call is named in the question too, so the dialog says what it asks
+  // about wherever the full text is drawn.
+  const head = (shown.head.length > 200 ? `${shown.head.slice(0, 200)}…` : shown.head).replaceAll('`', "'")
+  const others = shown.others === undefined || shown.others === 0 ? '' : ` and ${shown.others} other command${shown.others === 1 ? '' : 's'}`
+  // Against the head as the question draws it: cut, or with backticks
+  // swapped, it no longer says exactly what runs.
+  const isLong = shown.text !== head
+  const id = nextId++
   let answer: string | undefined
+  let placed = false
   try {
-    // The call is named in the question too: a phone card over Remote
-    // Control may show only the dialog, not the log row above it.
-    const head = shown.head.slice(0, 200).replaceAll('`', "'")
-    const others = shown.others === undefined || shown.others === 0 ? '' : ` and ${shown.others} other command${shown.others === 1 ? '' : 's'}`
-    const more = shown.text === shown.head ? '' : ' (full text in the transcript)'
-    answer = await $.ui.ask(`${messages} Run \`${head}\`${others}${more}?`, {
+    placed = isLong && (await openPanel($))
+    const more = !isLong ? '' : placed ? ' (full text in the side panel)' : ' (full text above)'
+    let question = `${messages} Run \`${head}\`${others}${more}?`
+    // Two calls can share a head; the number keeps each card on its own text.
+    if ([...waiting.values()].some(w => w.question === question)) question = `${question} (#${id})`
+    waiting.set(id, { question, text: shown.text })
+    changed($)
+    if (isLong && !placed) $.ui.log(`skill-router asks before running this: ${oneLine(preview(shown.text))}`)
+    answer = await $.ui.ask(question, {
       header: 'Approve',
       options: [RUN, ...(canSession ? [SESSION] : []), ...(canAlways ? [ALWAYS] : []), DONT_RUN],
     })
   } catch {
     answer = undefined
+  } finally {
+    waiting.delete(id)
+    changed($)
+    await closePanelIfIdle($)
   }
   if (answer === undefined) return `${messages} The approval dialog was dismissed, or nobody was here to answer it, so it was not run.`
   if (answer === RUN) return undefined
@@ -462,7 +564,48 @@ async function approve($: EngineInterface, gates: readonly Rule[], shown: Shown,
   return `Not run. The user answered: "${answer}"`
 }
 
+function questionOf(questions: readonly unknown[]): string | undefined {
+  const first = questions[0]
+  if (typeof first !== 'object' || first === null || !('question' in first)) return undefined
+  return typeof first.question === 'string' ? first.question : undefined
+}
+
 export const register: Register = on => {
+  on('ui.render', { component: 'Pane', requestId: PANE }, ($, e) => {
+    const { Box, Text, Code } = $.ui.resolve(e)
+    const calls = [...waiting.entries()]
+    if (calls.length === 0) return <Text dimColor>Nothing waiting for approval.</Text>
+    return (
+      <Box flexDirection="column">
+        {calls.map(([id, call]) => (
+          <Box key={`call-${id}`} flexDirection="column">
+            {calls.length > 1 && <Text bold>{call.question}</Text>}
+            <Code source={call.text} language="bash" />
+          </Box>
+        ))}
+      </Box>
+    )
+  })
+
+  // The desktop app, VS Code and the phone draw markdown in the dialog card,
+  // so the call goes there; the terminal's dialog has the panel or the row.
+  on('ui.render', { component: 'AskUserQuestion' }, async ($, e, next) => {
+    const dialog = await next(e)
+    const question = questionOf(e.props.questions)
+    const call = [...waiting.values()].find(w => w.question === question)
+    if (e.surface === 'terminal' || call === undefined) return dialog
+    const { Box, Markdown } = $.ui.resolve(e)
+    // One backtick past the longest run in the text, so nothing in it can
+    // close the fence and draw as card text above the question.
+    const fence = '`'.repeat(Math.max(3, ...[...call.text.matchAll(/`+/g)].map(m => m[0].length + 1)))
+    return (
+      <Box flexDirection="column">
+        <Markdown text={`${fence}bash\n${forCard(call.text)}\n${fence}`} />
+        {dialog}
+      </Box>
+    )
+  })
+
   on('session.start', async ($, e, next) => {
     await loadRules($)
     await $.command.register({ name: 'gates', description: 'List the approval gates always allowed, or reset them all', argumentHint: '[reset]' })
@@ -573,7 +716,7 @@ export const register: Register = on => {
         const allowed = await allowedIn($, scope, session)
         const asking = verdict.gates.filter(g => neverAlways(g) || !allowed.has(ruleId(g)))
         if (asking.length === 0) {
-          $.ui.log(`skill-router: allowed in ${scope ?? 'this project'} (/gates to review):\n\n${preview(formatted.text)}`)
+          $.ui.log(`skill-router: allowed in ${scope ?? 'this project'} (/gates to review): ${oneLine(preview(formatted.text))}`)
         } else {
           const files = command !== undefined ? await bodyFiles($, command, formatted, verdict.gates) : ''
           // Named by a gate still asking, not one already allowed.

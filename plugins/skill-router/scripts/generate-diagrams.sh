@@ -65,7 +65,7 @@ generate_hook_diagram() {
 %% Auto-generated from advisor-rules.conf — do not edit by hand
 %% Regenerate: bash plugins/skill-router/scripts/generate-diagrams.sh
 flowchart TB
-    subgraph hook["tool.call hook · hooks/register.ts"]
+    subgraph hook["tool.call hook · hooks/register.tsx"]
         direction TB
         CMD[/"Bash command or MCP tool call"/]
         NORM["Blank quotes and heredocs\nsplit on && || ; | and \$()"]
