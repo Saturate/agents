@@ -4,7 +4,7 @@ description: Meta-skill that maps tasks to the right skill. Consult at the start
 user-invocable: true
 metadata:
   author: Saturate
-  version: "3.2"
+  version: "3.3"
 ---
 
 # Skill Router
@@ -44,7 +44,7 @@ Task arrives
   ├── Writing prose (blog, article, docs) ────→ no-ai-slop
   ├── Writing an ADR / architecture doc ──────→ documentation-adrs
   │
-  ├── Pre-launch / deploy readiness ──────────→ /ship  (parallel review, human go/no-go)
+  ├── Pre-launch / deploy readiness ──────────→ /preflight  (parallel review, human go/no-go)
   │
   └── Action skills (narrow, tool-specific):
         ├── Adding a dependency ──────────────→ evaluating-dependencies
@@ -123,7 +123,7 @@ A task isn't done until there's evidence — passing tests, build output, runtim
 | Review | code-metrics | LOC, complexity, dup signals |
 | Review | documentation-adrs | Decision records |
 | Write | no-ai-slop | Anti-slop prose writing |
-| Ship | `/ship` | Parallel fan-out review, go/no-go + rollback |
+| Ship | `/preflight` | Parallel fan-out review, go/no-go + rollback |
 | Ship | launch-checklist | Deploy readiness checklist |
 | Ship | commit | Commit message style |
 | Ship | push | Run quality gates before pushing |
