@@ -1,5 +1,5 @@
 ---
-name: ship
+name: preflight
 description: Run parallel pre-launch review with code-reviewer, security-auditor, and test-engineer, then synthesize a go/no-go decision.
 user-invocable: true
 allowed-tools: Read Grep Glob Bash Agent
@@ -10,7 +10,7 @@ metadata:
 
 # Ship
 
-`/ship` is a **fan-out orchestrator**. It runs three specialist agents in parallel against the current changes, then merges their reports into a single go/no-go decision with a rollback plan.
+`/preflight` is a **fan-out orchestrator**. It runs three specialist agents in parallel against the current changes, then merges their reports into a single go/no-go decision with a rollback plan.
 
 ## Phase A - Parallel fan-out
 
