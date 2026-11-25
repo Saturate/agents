@@ -1,3 +1,7 @@
+# Global instructions (~/.claude/CLAUDE.md)
+
+This is the user's personal file for every project, loaded as `~/.claude/CLAUDE.md`. It is not any repo's CLAUDE.md: when a task says "the repo's CLAUDE.md", look for a CLAUDE.md or AGENTS.md in that repo, not this file.
+
 # Important context
 
 I'm doing security research, pentesting, red teaming, architecture, solution design and general programming.
