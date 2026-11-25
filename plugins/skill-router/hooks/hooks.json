@@ -1,6 +1,6 @@
 {
   "description": "Injects the skill-router meta-skill at session start. The hooks module enforces skill use and approval gates on tool calls.",
-  "modules": ["./register.ts"],
+  "modules": ["./register.tsx"],
   "hooks": {
     "SessionStart": [
       {

@@ -1,3 +1,4 @@
+import type { RenderSurface } from 'claude-code'
 import { expect, mock, test } from 'claude-code/testing'
 
 import { normalizeRemote } from './register'
@@ -41,6 +42,13 @@ type Setup = {
   azShown?: string[]
   // The default branch `git ls-remote --symref` reports; null when it fails.
   defaultBranch?: string | null
+  // Set to have the side panel placed; 'closed' is pushed when it closes.
+  panel?: string[]
+  surfaces?: RenderSurface[]
+  // False to have the panel opened but not placed (a narrow terminal).
+  placed?: boolean
+  // Runs while the dialog is up, as a surface drawing beside it would.
+  whileAsking?: (question: string) => Promise<void>
 }
 
 function engine(on: Parameters<Parameters<typeof test>[1]>[1], setup: Setup) {
@@ -97,13 +105,29 @@ function engine(on: Parameters<Parameters<typeof test>[1]>[1], setup: Setup) {
   } else {
     mock.store(on)
   }
+  // The layout is checked with its line breaks: the notice spells each as ⏎.
   on('ui.log', (_, e) => {
-    setup.logged?.push(e.text)
+    setup.logged?.push(e.text.replaceAll(' ⏎ ', '\n'))
     return { value: undefined }
   })
+  on('session.surfaces', () => ({ value: setup.surfaces ?? [] }))
+  if (setup.panel !== undefined) {
+    on('ui.open', () => {
+      setup.panel?.push('opened')
+      return { value: setup.placed === false ? { isPlaced: false, reason: 'narrow' } : { isPlaced: true } }
+    })
+    on('ui.close', () => {
+      setup.panel?.push('closed')
+      return { value: undefined }
+    })
+  }
   on('tool.call', (_, e) => {
     if (e.tool === 'AskUserQuestion') {
       setup.asked.push(e.questions?.[0]?.question ?? '')
+      if (setup.whileAsking !== undefined) {
+        const question = e.questions?.[0]?.question ?? ''
+        return setup.whileAsking(question).then(() => (setup.answer === undefined ? { deny: 'no one to ask' } : answerAsk(e, setup.answer)))
+      }
       setup.offered?.push(JSON.stringify(e.questions?.[0]?.options ?? []))
       if (setup.answer === undefined) return { deny: 'no one to ask' }
       return answerAsk(e, setup.answer)
@@ -477,7 +501,164 @@ test('the full command is shown in the transcript before the dialog', async ($, 
   await $.tool.call({ tool: 'Bash', command: 'gh pr comment 1 --body "the full body text"' })
 
   expect(setup.logged?.join('\n')).toContain('the full body text')
-  expect(setup.asked[0]).toContain('(full text in the transcript)')
+  expect(setup.asked[0]).toContain('(full text above)')
+})
+
+test('a wide terminal shows the full command in a side panel while it asks', async ($, on) => {
+  const drawn: string[] = []
+  const setup: Setup = {
+    answer: "Don't run",
+    ran: [],
+    asked: [],
+    logged: [],
+    panel: [],
+    surfaces: ['terminal'],
+    whileAsking: async () => {
+      const ui = await $.ui.mount({
+        plugin: 'skill-router',
+        surface: 'terminal',
+        component: 'Pane',
+        requestId: 'skill-router-approve',
+        props: { title: 'skill-router: approve', isFocused: false, bodyColumns: 80, placement: 'dock', scroll: { offset: 0, bodyRows: 20 }, view: {} },
+      })
+      drawn.push((await ui.find({ type: 'Code' }))?.text ?? '')
+      await ui.unmount()
+    },
+  }
+  engine(on, setup)
+
+  await $.tool.call({ tool: 'Bash', command: 'gh pr comment 1 --body "line one\nline two"' })
+
+  expect(drawn[0]).toContain('│ line one\n  │ line two')
+  expect(setup.asked[0]).toContain('(full text in the side panel)')
+  expect(setup.logged).toEqual([])
+  expect(setup.panel).toEqual(['opened', 'closed'])
+})
+
+test('no panel opens while a phone is attached, and the terminal gets the row', async ($, on) => {
+  const setup: Setup = { answer: "Don't run", ran: [], asked: [], logged: [], panel: [], surfaces: ['terminal', 'mobile'] }
+  engine(on, setup)
+
+  await $.tool.call({ tool: 'Bash', command: 'gh pr comment 1 --body "the full body text"' })
+
+  expect(setup.panel).toEqual([])
+  expect(setup.logged?.join('\n')).toContain('the full body text')
+  expect(setup.asked[0]).toContain('(full text above)')
+})
+
+test('a short call the question cannot quote exactly is still shown whole', async ($, on) => {
+  const setup: Setup = { answer: "Don't run", ran: [], asked: [], logged: [], surfaces: ['terminal'] }
+  engine(on, setup)
+
+  await $.tool.call({ tool: 'Bash', command: 'git push --force origin `git branch --show-current`' })
+
+  expect(setup.asked[0]).toContain('(full text above)')
+  expect(setup.logged?.join('\n')).toContain('`git branch --show-current`')
+})
+
+test('a panel too narrow to place is closed, and the terminal gets the row', async ($, on) => {
+  const setup: Setup = { answer: "Don't run", ran: [], asked: [], logged: [], panel: [], surfaces: ['terminal'], placed: false }
+  engine(on, setup)
+
+  await $.tool.call({ tool: 'Bash', command: 'gh pr comment 1 --body "the full body text"' })
+
+  expect(setup.panel).toEqual(['opened', 'closed'])
+  expect(setup.logged?.join('\n')).toContain('the full body text')
+})
+
+test('two waiting calls with the same question each get their own card', async ($, on) => {
+  const cards: string[] = []
+  const questions: string[] = []
+  let second: Promise<unknown> | undefined
+  const setup: Setup = {
+    answer: "Don't run",
+    ran: [],
+    asked: [],
+    logged: [],
+    whileAsking: async question => {
+      questions.push(question)
+      // The first dialog is still up when the second call asks.
+      if (second === undefined) {
+        second = $.tool.call({ tool: 'Bash', command: 'gh pr comment 3 --body "EVIL BODY"' })
+        await second
+      }
+      const ui = await $.ui.mount({
+        plugin: 'skill-router',
+        surface: 'mobile',
+        component: 'AskUserQuestion',
+        props: { tool: 'AskUserQuestion', questions: [{ question, header: 'Approve', options: [], multiSelect: false }] },
+      })
+      cards.push((await ui.find({ type: 'Markdown' }))?.text ?? '')
+      await ui.unmount()
+    },
+  }
+  engine(on, setup)
+  on('ui.render', { component: 'AskUserQuestion' }, () => ({ type: 'engine', ref: 0 }))
+
+  await $.tool.call({ tool: 'Bash', command: 'gh pr comment 3 --body "SAFE BODY"' })
+
+  expect(questions[0]).not.toBe(questions[1])
+  // The second call's card drew first, while the first dialog waited.
+  expect(cards[0]).toContain('EVIL BODY')
+  expect(cards[1]).toContain('SAFE BODY')
+  expect(cards[1]).not.toContain('EVIL BODY')
+})
+
+test('a long call is cut in the card with a note, and backticks cannot close its fence', async ($, on) => {
+  const drawn: string[] = []
+  const setup: Setup = {
+    answer: "Don't run",
+    ran: [],
+    asked: [],
+    logged: [],
+    whileAsking: async question => {
+      const ui = await $.ui.mount({
+        plugin: 'skill-router',
+        surface: 'desktop',
+        component: 'AskUserQuestion',
+        props: { tool: 'AskUserQuestion', questions: [{ question, header: 'Approve', options: [], multiSelect: false }] },
+      })
+      drawn.push((await ui.find({ type: 'Markdown' }))?.text ?? '')
+      await ui.unmount()
+    },
+  }
+  engine(on, setup)
+  on('ui.render', { component: 'AskUserQuestion' }, () => ({ type: 'engine', ref: 0 }))
+  const body = ['````', 'not the end', ...Array.from({ length: 40 }, (_, i) => `line ${i}`)].join('\n')
+
+  await $.tool.call({ tool: 'Bash', command: `gh pr comment 1 --body "${body}"` })
+
+  expect(drawn[0]?.startsWith('`````bash\n')).toBe(true)
+  expect(drawn[0]).toContain('more lines; ask Claude for the full text before approving)')
+  expect(drawn[0]?.endsWith('\n`````')).toBe(true)
+})
+
+test('a remote dialog card holds the full command above the question', async ($, on) => {
+  const drawn: string[] = []
+  const setup: Setup = {
+    answer: "Don't run",
+    ran: [],
+    asked: [],
+    logged: [],
+    whileAsking: async question => {
+      const ui = await $.ui.mount({
+        plugin: 'skill-router',
+        surface: 'mobile',
+        component: 'AskUserQuestion',
+        props: { tool: 'AskUserQuestion', questions: [{ question, header: 'Approve', options: [], multiSelect: false }] },
+      })
+      drawn.push((await ui.find({ type: 'Markdown' }))?.text ?? '')
+      await ui.unmount()
+    },
+  }
+  engine(on, setup)
+  // Core draws the dialog itself; its node stands for that drawing.
+  on('ui.render', { component: 'AskUserQuestion' }, () => ({ type: 'engine', ref: 0 }))
+
+  await $.tool.call({ tool: 'Bash', command: 'gh pr comment 1 --body "the full body text"' })
+
+  expect(drawn[0]).toContain('```bash')
+  expect(drawn[0]).toContain('the full body text')
 })
 
 test('allow for this session skips the dialog until reset, and is never stored', async ($, on) => {
@@ -681,9 +862,9 @@ test('the question names the command that tripped the gate', async ($, on) => {
   await $.tool.call({ tool: 'Bash', command: 'git -C ../other push --force origin main 2>&1 | tail -1' })
   await $.tool.call({ tool: 'Bash', command: "B=/tmp/body.md && cat > $B <<'EOF'\nThe body\nEOF\ngh pr comment 3 --body-file $B" })
 
-  expect(setup.asked[0]).toContain('Run `git push -q --force-with-lease origin fix/x` and 2 other commands (full text in the transcript)?')
+  expect(setup.asked[0]).toContain('Run `git push -q --force-with-lease origin fix/x` and 2 other commands (full text above)?')
   expect(setup.asked[1]).toContain('Run `git reset --hard`?')
-  expect(setup.asked[2]).toContain('Run `git push --force origin "fix/x"` and 1 other command (full text in the transcript)?')
+  expect(setup.asked[2]).toContain('Run `git push --force origin "fix/x"` and 1 other command (full text above)?')
   expect(setup.asked[3]).toContain("Run `git -C ../other push --force origin main 2>&1` and 1 other command")
   expect(setup.asked[4]).toContain('Run `gh pr comment 3 --body-file $B` and 2 other commands')
 })
